@@ -37,6 +37,10 @@ Others:
 
 **Microsoft .NET Framework 4.7.2** (for Windows lower than Windows 10)
 
+## Linux
+
+A Linux port is in progress. See [docs/LINUX_PORTING.md](docs/LINUX_PORTING.md) for the porting guide (C# on Mono, or Python + Kivy) and [linux/](linux) for the udev rules and starter code.
+
 ## References:
 
 **Official forum** and **Binary releases**: https://gbatemp.net/threads/tool-joy-con-toolkit-v1-0.478560/

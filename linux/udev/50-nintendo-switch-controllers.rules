@@ -1,0 +1,20 @@
+# Let the logged-in user open Nintendo Switch controllers through hidraw,
+# so Joy-Con Toolkit does not need to run as root.
+#
+# Install:
+#   sudo cp 50-nintendo-switch-controllers.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+# Then reconnect the controller.
+
+# USB (Pro Controller, Joy-Con charging grip)
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="057e", ATTRS{idProduct}=="2006|2007|2009|200e", MODE="0660", TAG+="uaccess"
+
+# Bluetooth (the HID id is part of the parent device name, e.g. 0005:057E:2009.0003)
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="*:057E:2006.*", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="*:057E:2007.*", MODE="0660", TAG+="uaccess"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="*:057E:2009.*", MODE="0660", TAG+="uaccess"
+
+# Third-party controllers that report as "Wireless Gamepad" with another
+# vendor/product id: run `mono jcprobe.exe -l` (or `jctool -l`) to find the
+# ids and add a line like this one, with your ids in uppercase hex:
+# KERNEL=="hidraw*", SUBSYSTEM=="hidraw", KERNELS=="*:VVVV:PPPP.*", MODE="0660", TAG+="uaccess"
