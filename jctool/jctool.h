@@ -93,6 +93,7 @@ struct ir_image_config {
     u8  ir_hand_analysis_threshold;
     u32 ir_denoise; // MSByte: Enable/Disable, Middle Byte: Edge smoothing, LSB: Color interpolation
     u8  ir_flip;
+    u8  ir_mode;
 };
 
 #pragma pack(pop)
@@ -115,6 +116,7 @@ extern int send_custom_command(u8* arg);
 extern int device_connection();
 extern int set_led_busy();
 extern int button_test();
+extern int get_raw_ir_image(u8 mode, u8 show_status);
 extern int ir_sensor(ir_image_config &ir_cfg);
 extern int ir_sensor_config_live(ir_image_config &ir_cfg);
 extern int nfc_tag_info();

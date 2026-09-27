@@ -762,6 +762,7 @@ int send_custom_command(u8* arg) {
     return 0;
 }
 
+int get_raw_ir_image(u8 mode, u8 show_status);
 
 int button_test() {
     int res;
@@ -1393,8 +1394,42 @@ int ir_sensor_auto_exposure(int white_pixels_percent) {
     return res;
 }
 
+void hline(u8* buffer, u16 x0, u16 x1, u16 y, u8 brightness) {
+    u8* line = buffer + y * 320;
+    for (u16 x = x0; x <= x1; x++)
+        line[x] = brightness;
+}
 
-int get_raw_ir_image(u8 show_status) {
+void vline(u8* buffer, u16 x, u16 y0, u16 y1, u8 brightness) {
+    u8* line = buffer + x;
+    for (u16 y = y0; y <= y1; y++)
+        line[y*320] = brightness;
+}
+
+void drawCluster(u8* buffer, u16* data) {
+    u8 brightness = data[1];
+    u16 x0 = data[4];
+    u16 x1 = data[5];
+    u16 y0 = data[6];
+    u16 y1 = data[7];
+    u16 cx = (data[2] + 32) / 64;
+    u16 cy = (data[3] + 32) / 64;
+    if (x1 < x0 || y1 < y0 || x1 >= 320 || y1 >= 240 || cx < x0 || cx > x1 || cy < y0 || cy > y1) {
+        printf("err: ");
+        for (int i = 0; i < 16; i++)
+            printf("%02x", ((u8*)data)[i]);
+        printf("\n");
+        return;
+    }
+    hline(buffer, x0, x1, y0, brightness);
+    hline(buffer, x0, x1, y1, brightness);
+    hline(buffer, x0, x1, cy, brightness);
+    vline(buffer, x0, y0, y1, brightness);
+    vline(buffer, x1, y0, y1, brightness);
+    vline(buffer, cx, y0, y1, brightness);
+}
+
+int get_raw_ir_image(u8 mode, u8 show_status) {
     std::stringstream ir_status;
 
     int elapsed_time = 0;
@@ -1440,10 +1475,9 @@ int get_raw_ir_image(u8 show_status) {
         hid_read_timeout(handle, buf_reply, sizeof(buf_reply), 200);
 
         //Check if new packet
-        if (buf_reply[0] == 0x31 && buf_reply[49] == 0x03) {
+        if (buf_reply[0] == 0x31 && buf_reply[49] == 0x03 && buf_reply[51] == mode) {
             got_frag_no = buf_reply[52];
-            if (got_frag_no == (previous_frag_no + 1) % (ir_max_frag_no + 1)) {
-                
+            if (got_frag_no == (previous_frag_no + 1) % (ir_max_frag_no + 1) || mode != 0x07) {
                 previous_frag_no = got_frag_no;
 
                 // ACK for fragment
@@ -1453,38 +1487,60 @@ int get_raw_ir_image(u8 show_status) {
                 buf[47] = mcu_crc8_calc(buf + 11, 36);
                 hid_write(handle, buf, sizeof(buf));
 
-                memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
-
-                // Auto exposure.
-                // TODO: Fix placement, so it doesn't drop next fragment.
-                if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0){
-                    white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
-                    ir_sensor_auto_exposure(white_pixels_percent);
+                if (mode == 0x06) {
+                    memset(buf_image, 0, 320 * 240);
+                    for (int i = 61; i + 16 <= 59+300; i += 16) {
+                        if (buf_reply[i] != 0 || buf_reply[i + 1] != 0) {
+                            drawCluster(buf_image, (u16*)(buf_reply + i));
+                        }
+                    }
                 }
+                else if (mode == 0x04)
+                {
+                    // weird data arrangement!
+                    memset(buf_image, 0, 320 * 240);
+                    for (int i = 61; i + 16 <= 59+300; i += 16) {
+                        if (i == 61 + 48 || i == 61 + 97 || i == 61 + 146 || i == 61 + 195 || i == 61 + 244)
+                            i++;
+                        if (buf_reply[i] != 0 || buf_reply[i + 1] != 0) {
+                            drawCluster(buf_image, (u16*)(buf_reply + i));
+                        }
+                    }
+                }
+                else if (mode == 0x07) {
+                    memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
 
-                // Status percentage
-                ir_status.str("");
-                ir_status.clear();
-                if (initialization < 2) {
-                    if (show_status == 2)
-                        ir_status << "Status: Streaming.. ";
+                    // Auto exposure.
+                    // TODO: Fix placement, so it doesn't drop next fragment.
+                    if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0) {
+                        white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
+                        ir_sensor_auto_exposure(white_pixels_percent);
+                    }
+
+                    // Status percentage
+                    ir_status.str("");
+                    ir_status.clear();
+                    if (initialization < 2) {
+                        if (show_status == 2)
+                            ir_status << "Status: Streaming.. ";
+                        else
+                            ir_status << "Status: Receiving.. ";
+                    }
                     else
-                        ir_status << "Status: Receiving.. ";
+                        ir_status << "Status: Initializing.. ";
+                    ir_status << std::setfill(' ') << std::setw(3);
+                    ir_status << std::fixed << std::setprecision(0) << (float)got_frag_no / (float)(ir_max_frag_no + 1) * 100.0f;
+                    ir_status << "% - ";
+
+                    //debug
+                   // printf("%02X Frag: Copy\n", got_frag_no);
+
+                    FormJoy::myform1->lbl_IRStatus->Text = gcnew String(ir_status.str().c_str()) + (sw->ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                    elapsed_time = sw->ElapsedMilliseconds;
                 }
-                else
-                    ir_status << "Status: Initializing.. ";
-                ir_status << std::setfill(' ') << std::setw(3);
-                ir_status << std::fixed << std::setprecision(0) << (float)got_frag_no / (float)(ir_max_frag_no + 1) * 100.0f;
-                ir_status << "% - ";
-
-                //debug
-               // printf("%02X Frag: Copy\n", got_frag_no);
-
-                FormJoy::myform1->lbl_IRStatus->Text = gcnew String(ir_status.str().c_str()) + (sw->ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                elapsed_time = sw->ElapsedMilliseconds;
 
                 // Check if final fragment. Draw the frame.
-                if (got_frag_no == ir_max_frag_no) {
+                if (got_frag_no == ir_max_frag_no || mode != 0x07) {
                     // Update Viewport
                     elapsed_time2 = sw->ElapsedMilliseconds - elapsed_time2;
                     FormJoy::myform1->setIRPictureWindow(buf_image, true);
@@ -1854,7 +1910,7 @@ step5:
         pkt->subcmd = 0x21;
         pkt->subcmd_21_23_01.mcu_cmd     = 0x23;
         pkt->subcmd_21_23_01.mcu_subcmd  = 0x01; // Set IR mode cmd
-        pkt->subcmd_21_23_01.mcu_ir_mode = 0x07; // IR mode - 2: No mode/Disable?, 3: Moment, 4: Dpd (Wii-style pointing), 6: Clustering,
+        pkt->subcmd_21_23_01.mcu_ir_mode = ir_cfg.ir_mode; // IR mode - 2: No mode/Disable?, 3: Moment, 4: Dpd (Wii-style pointing), 6: Clustering,
                                                  // 7: Image transfer, 8-10: Hand analysis (Silhouette, Image, Silhouette/Image), 0,1/5/10+: Unknown
         pkt->subcmd_21_23_01.no_of_frags = ir_max_frag_no; // Set number of packets to output per buffer
         pkt->subcmd_21_23_01.mcu_major_v = 0x0500; // Set required IR MCU FW v5.18. Major 0x0005.
@@ -1865,6 +1921,7 @@ step5:
         int retries = 0;
         while (1) {
             res = hid_read_timeout(handle, buf, sizeof(buf), 64);
+
             if (buf[0] == 0x21) {
                 // Mode set Ack
                 if (buf[15] == 0x0b)
@@ -1903,7 +1960,8 @@ step6:
             res = hid_read_timeout(handle, buf, sizeof(buf), 64);
             if (buf[0] == 0x31) {
                 // mode set to 7: Image transfer
-                if (buf[49] == 0x13 && *(u16*)&buf[50] == 0x0700)
+
+                if (buf[49] == 0x13 && buf[50] == 0 && buf[51] == ir_cfg.ir_mode)
                     goto step7;
             }
             retries++;
@@ -1971,7 +2029,7 @@ step7:
             res = hid_read_timeout(handle, buf, sizeof(buf), 64);
             if (buf[0] == 0x21) {
                 // Registers for mode 7: Image transfer set
-                if (buf[15] == 0x13 && *(u16*)&buf[16] == 0x0700)
+                if (buf[15] == 0x13 && buf[16] == 0 && buf[17] == (ir_cfg.ir_mode == 0x04 ? 0x02 : ir_cfg.ir_mode))
                     goto step8;
             }
             retries++;
@@ -2029,7 +2087,9 @@ step8:
             res = hid_read_timeout(handle, buf, sizeof(buf), 64);
             if (buf[0] == 0x21) {
                 // Registers for mode 7: Image transfer set
-                if (buf[15] == 0x13 && *(u16*)&buf[16] == 0x0700)
+                // Keep the original x0700 check for image transfer and also accept the reply seen in pointing/clustering
+                if (buf[15] == 0x13 && ((buf[16] == 0 && buf[17] == (ir_cfg.ir_mode == 0x04 ? 0x02 : ir_cfg.ir_mode)) ||
+                    (buf[50] == 0 && buf[51] == ir_cfg.ir_mode)))
                     goto step9;
                 // If the Joy-Con gets to reply to the previous x11 - x03 02 cmd before sending the above,
                 // it will reply with the following if we do not send x11 - x03 02 again:
@@ -2050,9 +2110,9 @@ step8:
 step9:
     // Stream or Capture images from NIR Camera
     if (enable_IRVideoPhoto)
-        res_get = get_raw_ir_image(2);
+        res_get = get_raw_ir_image(ir_cfg.ir_mode, 2);
     else
-        res_get = get_raw_ir_image(1);
+        res_get = get_raw_ir_image(ir_cfg.ir_mode, 1);
 
     //////
     // TODO: Should we send subcmd x21 with 'x230102' to disable IR mode before disabling MCU?

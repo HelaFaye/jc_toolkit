@@ -275,6 +275,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
     private: System::Windows::Forms::RadioButton^  radioBtn_IR60p;
     private: System::Windows::Forms::RadioButton^  radioBtn_IR120p;
     private: System::Windows::Forms::RadioButton^  radioBtn_IR240p;
+    private: System::Windows::Forms::GroupBox^ grpBox_IRMode;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModeCapture;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModeClustering;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModePointing;
     private: System::Windows::Forms::TrackBar^  trackBar_IRGain;
     private: System::Windows::Forms::CheckBox^  chkBox_IRDimLeds;
     private: System::Windows::Forms::CheckBox^  chkBox_IRBrightLeds;
@@ -521,6 +525,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR60p = (gcnew System::Windows::Forms::RadioButton());
             this->radioBtn_IR120p = (gcnew System::Windows::Forms::RadioButton());
             this->radioBtn_IR240p = (gcnew System::Windows::Forms::RadioButton());
+            this->grpBox_IRMode = (gcnew System::Windows::Forms::GroupBox());
+            this->radioBtn_IRModeCapture = (gcnew System::Windows::Forms::RadioButton());
+            this->radioBtn_IRModeClustering = (gcnew System::Windows::Forms::RadioButton());
+            this->radioBtn_IRModePointing = (gcnew System::Windows::Forms::RadioButton());
             this->grpBox_nfc = (gcnew System::Windows::Forms::GroupBox());
             this->txtBox_NFCTag = (gcnew System::Windows::Forms::TextBox());
             this->txtBox_nfcUid = (gcnew System::Windows::Forms::TextBox());
@@ -621,6 +629,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_IRCustomRegAddr))->BeginInit();
             this->grpBox_IRColorize->SuspendLayout();
             this->grpBox_IRRes->SuspendLayout();
+            this->grpBox_IRMode->SuspendLayout();
             this->grpBox_nfc->SuspendLayout();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_plus))->BeginInit();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_center))->BeginInit();
@@ -2660,9 +2669,9 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRColorize->FlatStyle = System::Windows::Forms::FlatStyle::Flat;
             this->grpBox_IRColorize->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(9)), static_cast<System::Int32>(static_cast<System::Byte>(255)),
                 static_cast<System::Int32>(static_cast<System::Byte>(206)));
-            this->grpBox_IRColorize->Location = System::Drawing::Point(138, 20);
+            this->grpBox_IRColorize->Location = System::Drawing::Point(88/*138*/, 20);
             this->grpBox_IRColorize->Name = L"grpBox_IRColorize";
-            this->grpBox_IRColorize->Size = System::Drawing::Size(125, 130);
+            this->grpBox_IRColorize->Size = System::Drawing::Size(95/*125*/, 130);
             this->grpBox_IRColorize->TabIndex = 4;
             this->grpBox_IRColorize->TabStop = false;
             this->grpBox_IRColorize->Text = L"Colorize";
@@ -2699,7 +2708,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IRColorGreen->Name = L"radioBtn_IRColorGreen";
             this->radioBtn_IRColorGreen->Size = System::Drawing::Size(95, 21);
             this->radioBtn_IRColorGreen->TabIndex = 2;
-            this->radioBtn_IRColorGreen->Text = L"Night vision";
+            this->radioBtn_IRColorGreen->Text = L"Night vis";
             this->radioBtn_IRColorGreen->UseVisualStyleBackColor = false;
             // 
             // radioBtn_IRColorRed
@@ -2778,7 +2787,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 static_cast<System::Int32>(static_cast<System::Byte>(206)));
             this->grpBox_IRRes->Location = System::Drawing::Point(10, 20);
             this->grpBox_IRRes->Name = L"grpBox_IRRes";
-            this->grpBox_IRRes->Size = System::Drawing::Size(125, 130);
+            this->grpBox_IRRes->Size = System::Drawing::Size(85/*125*/, 130);
             this->grpBox_IRRes->TabIndex = 3;
             this->grpBox_IRRes->TabStop = false;
             this->grpBox_IRRes->Text = L"Resolution";
@@ -2798,7 +2807,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR30p->Name = L"radioBtn_IR30p";
             this->radioBtn_IR30p->Size = System::Drawing::Size(68, 21);
             this->radioBtn_IR30p->TabIndex = 3;
-            this->radioBtn_IR30p->Text = L"30 x 40";
+            this->radioBtn_IR30p->Text = L"30x40";
             this->radioBtn_IR30p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR30p->UseVisualStyleBackColor = false;
             // 
@@ -2817,7 +2826,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR60p->Name = L"radioBtn_IR60p";
             this->radioBtn_IR60p->Size = System::Drawing::Size(68, 21);
             this->radioBtn_IR60p->TabIndex = 2;
-            this->radioBtn_IR60p->Text = L"60 x 80";
+            this->radioBtn_IR60p->Text = L"60x80";
             this->radioBtn_IR60p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR60p->UseVisualStyleBackColor = false;
             // 
@@ -2836,7 +2845,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR120p->Name = L"radioBtn_IR120p";
             this->radioBtn_IR120p->Size = System::Drawing::Size(82, 21);
             this->radioBtn_IR120p->TabIndex = 1;
-            this->radioBtn_IR120p->Text = L"120 x 160";
+            this->radioBtn_IR120p->Text = L"120x160";
             this->radioBtn_IR120p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR120p->UseVisualStyleBackColor = false;
             // 
@@ -2858,9 +2867,81 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR240p->Size = System::Drawing::Size(82, 21);
             this->radioBtn_IR240p->TabIndex = 0;
             this->radioBtn_IR240p->TabStop = true;
-            this->radioBtn_IR240p->Text = L"240 x 320";
+            this->radioBtn_IR240p->Text = L"240x320";
             this->radioBtn_IR240p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR240p->UseVisualStyleBackColor = false;
+            // 
+            // grpBox_IRMode
+            // 
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModeCapture);
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModeClustering);
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModePointing);
+            this->grpBox_IRMode->FlatStyle = System::Windows::Forms::FlatStyle::Flat;
+            this->grpBox_IRMode->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(9)), static_cast<System::Int32>(static_cast<System::Byte>(255)),
+                static_cast<System::Int32>(static_cast<System::Byte>(206)));
+            this->grpBox_IRMode->Location = System::Drawing::Point(175, 20);
+            this->grpBox_IRMode->Name = L"grpBox_IRMode";
+            this->grpBox_IRMode->Size = System::Drawing::Size(95, 130);
+            this->grpBox_IRMode->TabIndex = 4;
+            this->grpBox_IRMode->TabStop = false;
+            this->grpBox_IRMode->Text = L"Mode";
+            // 
+            // radioBtn_IRModeCapture
+            // 
+            this->radioBtn_IRModeCapture->AutoSize = true;
+            this->radioBtn_IRModeCapture->Checked = true;
+            this->radioBtn_IRModeCapture->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModeCapture->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModeCapture->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModeCapture->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModeCapture->Location = System::Drawing::Point(10, 21);
+            this->radioBtn_IRModeCapture->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModeCapture->Name = L"radioBtn_IRModeCapture";
+            this->radioBtn_IRModeCapture->Size = System::Drawing::Size(68, 21);
+            this->radioBtn_IRModeCapture->TabIndex = 3;
+            this->radioBtn_IRModeCapture->Text = L"Capture";
+            this->radioBtn_IRModeCapture->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+            this->radioBtn_IRModeCapture->UseVisualStyleBackColor = false;
+            // 
+            // radioBtn_IRModeClustering
+            // 
+            this->radioBtn_IRModeClustering->AutoSize = true;
+            this->radioBtn_IRModeClustering->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModeClustering->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModeClustering->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModeClustering->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModeClustering->Location = System::Drawing::Point(10, 75);
+            this->radioBtn_IRModeClustering->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModeClustering->Name = L"radioBtn_IRModeClustering";
+            this->radioBtn_IRModeClustering->Size = System::Drawing::Size(68, 21);
+            this->radioBtn_IRModeClustering->TabIndex = 2;
+            this->radioBtn_IRModeClustering->Text = L"Cluster";
+            this->radioBtn_IRModeClustering->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+            this->radioBtn_IRModeClustering->UseVisualStyleBackColor = false;
+            // 
+            // radioBtn_IRModePointing
+            // 
+            this->radioBtn_IRModePointing->AutoSize = true;
+            this->radioBtn_IRModePointing->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModePointing->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModePointing->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModePointing->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModePointing->Location = System::Drawing::Point(10, 48);
+            this->radioBtn_IRModePointing->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModePointing->Name = L"radioBtn_IRModePointing";
+            this->radioBtn_IRModePointing->Size = System::Drawing::Size(82, 21);
+            this->radioBtn_IRModePointing->TabIndex = 1;
+            this->radioBtn_IRModePointing->Text = L"Pointing";
+            this->radioBtn_IRModePointing->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             // 
             // grpBox_nfc
             // 
@@ -3296,6 +3377,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRSettings->Controls->Add(this->btn_IRConfigLive);
             this->grpBox_IRSettings->Controls->Add(this->grpBox_IRRes);
             this->grpBox_IRSettings->Controls->Add(this->grpBox_IRColorize);
+            this->grpBox_IRSettings->Controls->Add(this->grpBox_IRMode);
             this->grpBox_IRSettings->Controls->Add(this->numeric_IRCustomRegVal);
             this->grpBox_IRSettings->Controls->Add(this->numeric_IRCustomRegAddr);
             this->grpBox_IRSettings->Controls->Add(this->lbl_exposure);
@@ -4061,6 +4143,8 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRColorize->PerformLayout();
             this->grpBox_IRRes->ResumeLayout(false);
             this->grpBox_IRRes->PerformLayout();
+            this->grpBox_IRMode->ResumeLayout(false);
+            this->grpBox_IRMode->PerformLayout();
             this->grpBox_nfc->ResumeLayout(false);
             this->grpBox_nfc->PerformLayout();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_plus))->EndInit();
@@ -6177,6 +6261,20 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 ir_new_config.ir_res_reg = 0b01101001; // Sensor Binning [4 x 2] and Skipping [2 x 4]
                 ir_max_frag_no  = 0x03;
             }
+
+            if (this->radioBtn_IRModeCapture->Checked) {
+                ir_new_config.ir_mode = 0x07;
+            }
+            else if (this->radioBtn_IRModePointing->Checked) {
+                ir_new_config.ir_mode = 0x04;
+                ir_image_width = 320;
+                ir_image_height = 240;
+            }
+            else if (this->radioBtn_IRModeClustering->Checked) {
+                ir_new_config.ir_mode = 0x06;
+                ir_image_width = 320;
+                ir_image_height = 240;
+            }
             else {
                 return 8;
             }
@@ -6337,9 +6435,9 @@ public ref class FormJoy : public System::Windows::Forms::Form
         graphicsHandle->InterpolationMode = System::Drawing::Drawing2D::InterpolationMode::HighQualityBicubic;
         graphicsHandle->DrawImage(rotatedImage, 0, 0, 240, 320);
 
-        this->pictureBoxIR->Image = resizedImage;
         this->pictureBoxIR->ClientSize = System::Drawing::Size(240, 320);
-        this->AutoScaleDimensions = System::Drawing::SizeF(96, 96);
+        this->pictureBoxIR->Image = resizedImage;
+        //this->AutoScaleDimensions = System::Drawing::SizeF(96, 96);
     }
 
     private: System::Void btn_getImage_Click(System::Object^  sender, System::EventArgs^  e) {
