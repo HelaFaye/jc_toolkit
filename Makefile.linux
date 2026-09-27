@@ -1,0 +1,60 @@
+.PHONY: all clean test test-full interactive install uninstall help
+
+CC := gcc
+CXX := g++
+CFLAGS := -Wall -Wextra -O2
+CXXFLAGS := -Wall -Wextra -O2
+LDFLAGS := $(shell pkg-config --libs hidapi-hidraw)
+CPPFLAGS := $(shell pkg-config --cflags hidapi-hidraw)
+
+TARGETS := jctool_test jctool_full jctool
+
+all: $(TARGETS)
+
+jctool_test: jctool_linux.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "[✓] Built $@"
+
+jctool_full: jctool_linux_full.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "[✓] Built $@"
+
+jctool: jctool_linux_interactive.cpp
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
+	@echo "[✓] Built $@"
+
+test: jctool_test
+	@echo "[*] Running minimal test..."
+	./jctool_test
+
+test-full: jctool_full
+	@echo "[*] Running full-featured test..."
+	./jctool_full
+
+interactive: jctool
+	@echo "[*] Running interactive menu..."
+	./jctool
+
+install: all
+	@echo "[*] Installing to /usr/local/bin..."
+	install -m 755 jctool_test jctool_full jctool /usr/local/bin/
+	@echo "[✓] Installation complete"
+
+uninstall:
+	rm -f /usr/local/bin/jctool_test /usr/local/bin/jctool_full /usr/local/bin/jctool
+	@echo "[✓] Uninstallation complete"
+
+clean:
+	rm -f $(TARGETS) *.o *.a *.so
+	@echo "[✓] Cleaned"
+
+help:
+	@echo "Joy-Con Toolkit (Linux CLI) - Make targets:"
+	@echo "  all         - Build all binaries (default)"
+	@echo "  test        - Build and run minimal test"
+	@echo "  test-full   - Build and run full-featured test"
+	@echo "  interactive - Build and run interactive menu"
+	@echo "  install     - Install binaries to /usr/local/bin"
+	@echo "  uninstall   - Remove installed binaries"
+	@echo "  clean       - Remove build artifacts"
+	@echo "  help        - Display this help message"
