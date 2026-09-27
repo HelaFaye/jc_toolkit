@@ -119,7 +119,17 @@ extern int ir_sensor(ir_image_config &ir_cfg);
 extern int ir_sensor_config_live(ir_image_config &ir_cfg);
 extern int nfc_tag_info();
 extern int silence_input_report();
-int  handle_ok;
+
+enum handle_type_t {
+    NOTHING = 0,
+    JOYCON_L = 1,
+    JOYCON_R = 2,
+    PROCON = 3
+};
+
+handle_type_t  handle_priority;
+handle_type_t  handle_type;
+
 bool enable_button_test;
 bool enable_IRVideoPhoto;
 bool enable_IRAutoExposure;

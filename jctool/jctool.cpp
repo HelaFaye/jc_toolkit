@@ -128,7 +128,7 @@ int set_led_busy() {
     res = hid_read_timeout(handle, buf, 0, 64);
 
     //Set breathing HOME Led
-    if (handle_ok != 1) {
+    if (handle_type != 1) {
         memset(buf, 0, sizeof(buf));
         hdr = (brcm_hdr *)buf;
         pkt = (brcm_cmd_01 *)(hdr + 1);
@@ -598,7 +598,7 @@ int send_rumble() {
     res = hid_read_timeout(handle, buf, 0, 64);
 
     // Set HOME Led
-    if (handle_ok != 1) {
+    if (handle_type != 1) {
         memset(buf, 0, sizeof(buf));
         hdr = (brcm_hdr *)buf;
         pkt = (brcm_cmd_01 *)(hdr + 1);
@@ -836,7 +836,7 @@ int button_test() {
     }
 
     // Stick calibration
-    if (handle_ok != 2) {
+    if (handle_type != 2) {
         stick_cal_x_l[1] = (factory_stick_cal[4] << 8) & 0xF00 | factory_stick_cal[3];
         stick_cal_y_l[1] = (factory_stick_cal[5] << 4) | (factory_stick_cal[4] >> 4);
         stick_cal_x_l[0] = stick_cal_x_l[1] - ((factory_stick_cal[7] << 8) & 0xF00 | factory_stick_cal[6]);
@@ -849,7 +849,7 @@ int button_test() {
     else {
         FormJoy::myform1->textBox_lstick_fcal->Text = L"L Stick Factory:\r\nNo calibration";
     }
-    if (handle_ok != 1) {
+    if (handle_type != 1) {
         stick_cal_x_r[1] = (factory_stick_cal[10] << 8) & 0xF00 | factory_stick_cal[9];
         stick_cal_y_r[1] = (factory_stick_cal[11] << 4) | (factory_stick_cal[10] >> 4);
         stick_cal_x_r[0] = stick_cal_x_r[1] - ((factory_stick_cal[13] << 8) & 0xF00 | factory_stick_cal[12]);
@@ -1003,7 +1003,7 @@ int button_test() {
                 for (int i = 3; i < 6; i++)
                     input_report_cmd += String::Format(L"{0:X2} ", buf_reply[i]);
             
-                if (handle_ok != 2) {
+                if (handle_type != 2) {
                     input_report_cmd += String::Format(L"\r\n\r\nL Stick (Raw/Cal):\r\nX:   {0:X3}   Y:   {1:X3}\r\n",
                         buf_reply[6] | (u16)((buf_reply[7] & 0xF) << 8),
                         (buf_reply[7] >> 4) | (buf_reply[8] << 4));
@@ -1018,7 +1018,7 @@ int button_test() {
                     input_report_cmd += String::Format(L"X: {0,5:f2}   Y: {1,5:f2}\r\n",
                         cal_x[0], cal_y[0]);
                 }
-                if (handle_ok != 1) {
+                if (handle_type != 1) {
                     input_report_cmd += String::Format(L"\r\n\r\nR Stick (Raw/Cal):\r\nX:   {0:X3}   Y:   {1:X3}\r\n",
                         buf_reply[9] | (u16)((buf_reply[10] & 0xF) << 8),
                         (buf_reply[10] >> 4) | (buf_reply[11] << 4));
@@ -2949,70 +2949,90 @@ void output_hid_device_info_list() {
     hid_free_enumeration(devs);
 }
 
+// Pseudo-third-party support. Some third-party controllers report as a
+// "Wireless Gamepad" by "Nintendo" instead of using Nintendo's VID/PIDs.
+// The user is asked once per device; an accepted device is reopened silently
+// by its path on later connection checks.
+int open_third_party_controller() {
+    static std::string accepted_path;
+    int result = NOTHING;
+
+    hid_device_info* devs = hid_enumerate(0x0, 0x0);
+    hid_device_info* cur_dev = devs;
+    while (cur_dev) {
+        std::wstring product_string      = cur_dev->product_string      ? cur_dev->product_string      : L"Unknown Product";
+        std::wstring manufacturer_string = cur_dev->manufacturer_string ? cur_dev->manufacturer_string : L"Unknown Manufacturer";
+
+        if (product_string == L"Wireless Gamepad" && manufacturer_string == L"Nintendo" && cur_dev->usage == 0x0005) {
+            bool use_device = !accepted_path.empty() && accepted_path == cur_dev->path;
+            if (!use_device) {
+                std::wstring third_party_warning = L"A potential third-party device has been detected:\n\n\t"
+                    + product_string + L" : " + manufacturer_string + L"\n\n"
+                    + L"Editing could be potentially unstable. Would you like to use this device anyways?";
+                use_device = MessageBox::Show(System::String(third_party_warning.c_str(), 0, third_party_warning.length()).ToString(),
+                    L"CTCaer's Joy-Con Toolkit - Third-Party Device Detected",
+                    MessageBoxButtons::YesNo, MessageBoxIcon::Warning) == System::Windows::Forms::DialogResult::Yes;
+            }
+            if (use_device) {
+                if (handle = hid_open_path(cur_dev->path)) {
+                    accepted_path = cur_dev->path;
+                    handle_type = PROCON;
+                    result = handle_type;
+                    break;
+                }
+                else {
+                    accepted_path.clear();
+                    MessageBox::Show(L"Could not obtain the device.\nIt's usage has been aborted.",
+                        L"CTCaer's Joy-Con Toolkit - Third-Party Device Connection Failed",
+                        MessageBoxButtons::OK, MessageBoxIcon::Stop);
+                }
+            }
+        }
+        cur_dev = cur_dev->next;
+    }
+    hid_free_enumeration(devs);
+    return result;
+}
+
 int device_connection(){
     if (check_connection_ok) {
         if (enable_hid_listings) {
             output_hid_device_info_list();
             enable_hid_listings = false;
         }
-        
-        handle_ok = 0;
-        // Joy-Con (L)
-        if (handle = hid_open(0x57e, 0x2006, nullptr)) {
-            handle_ok = 1;
-            return handle_ok;
-        }
-        // Joy-Con (R)
-        if (handle = hid_open(0x57e, 0x2007, nullptr)) {
-            handle_ok = 2;
-            return handle_ok;
-        }
-        // Pro Controller
-        if (handle = hid_open(0x57e, 0x2009, nullptr)) {
-            handle_ok = 3;
-            return handle_ok;
-        }
-        // Nothing found
-        else {
-            // Check for third-party controllers
-            hid_device_info* devs = hid_enumerate(0x0, 0x0);
-            hid_device_info* cur_dev = devs;
-            while (cur_dev) {
-                std::wstring product_string      = cur_dev->product_string      ? cur_dev->product_string      : L"Unknown Product";
-                std::wstring manufacturer_string = cur_dev->manufacturer_string ? cur_dev->manufacturer_string : L"Unknown Manufacturer";
-                std::wstring serial_number       = cur_dev->serial_number       ? cur_dev->serial_number       : L"Unknown Serial Number";
-                
-                if (product_string == L"Wireless Gamepad" && manufacturer_string == L"Nintendo" && cur_dev->usage == 0x0005) {
-                //if (true) {
-                    std::wstring third_party_warning = L"A potential third-party device has been detected:\n\n\t" 
-                        + product_string + L" : " + manufacturer_string + L"\n\n"
-                        + L"Editing could be potentially unstable. Would you like to use this device anyways?";
-                    if (MessageBox::Show(System::String(third_party_warning.c_str(), 0, third_party_warning.length()).ToString(),
-                        L"CTCaer's Joy-Con Toolkit - Third-Party Device Detected",
-                        MessageBoxButtons::YesNo, MessageBoxIcon::Warning) == System::Windows::Forms::DialogResult::Yes)
-                    {
-                        if (handle = hid_open(cur_dev->product_id, cur_dev->vendor_id, cur_dev->serial_number)) {
-                            // Maybe do some more tests here just to double check
-                            hid_free_enumeration(devs);
-                            handle_ok = 3;
-                            return handle_ok;
-                        }
-                        else {
-                            MessageBox::Show(L"Could not obtain the device.\nIt's usage has been aborted.",
-                                L"CTCaer's Joy-Con Toolkit - Third-Party Device Connection Failed",
-                                MessageBoxButtons::OK, MessageBoxIcon::Stop);
-                        }
-                    }
-                }
-                cur_dev = cur_dev->next;
+
+        handle_type = NOTHING;
+
+        constexpr int vendor_id = 0x57e;
+        constexpr int product_ids[] = { 0, 0x2006, 0x2007, 0x2009 };
+        if (handle_priority != NOTHING) {
+            handle = hid_open(vendor_id, product_ids[handle_priority], nullptr);
+            if (handle) {
+                handle_type = handle_priority;
+                return handle_type;
             }
-            hid_free_enumeration(devs);
-            return 0;
+            // Third-party controllers identify as Pro Controllers
+            else if (handle_priority == PROCON) {
+                return open_third_party_controller();
+            }
+            else {
+                return NOTHING;
+            }
+        }
+        else {
+            for (const handle_type_t type : { JOYCON_L, JOYCON_R, PROCON }) {
+                if (handle = hid_open(vendor_id, product_ids[type], nullptr)) {
+                    handle_type = type;
+                    return handle_type;
+                }
+            }
+            // Nothing found. Check for third-party controllers
+            return open_third_party_controller();
         }
     }
     /*
     //usb test
-    if (!handle_ok) {
+    if (!handle_type) {
         hid_init();
         struct hid_device_info *devs = hid_enumerate(0x057E, 0x200e);
         if (devs){
@@ -3023,12 +3043,12 @@ int device_connection(){
             printf("\nlol\n");
 
             if (handle)
-                handle_ok = 4;
+                handle_type = 4;
         }
         hid_free_enumeration(devs);
     }
     */
-    return handle_ok;
+    return handle_type;
 }
 
 [STAThread]
@@ -3081,7 +3101,7 @@ int Main(array<String^>^ args) {
     usb_command(handle);
     usb_command(handle);
     Sleep(2000);
-    if (handle_ok) {
+    if (handle_type) {
         usb_deinit(handle);
         hid_close(handle);
         usb_deinit(handle_l);
