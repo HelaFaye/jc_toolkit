@@ -3021,6 +3021,8 @@ int device_connection(){
         }
         else {
             for (const handle_type_t type : { JOYCON_L, JOYCON_R, PROCON }) {
+                if (type == PROCON)
+                    Sleep(1); // adding delay here supposedly makes the handle call work properly
                 if (handle = hid_open(vendor_id, product_ids[type], nullptr)) {
                     handle_type = type;
                     return handle_type;
