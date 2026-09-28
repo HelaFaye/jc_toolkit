@@ -1561,9 +1561,16 @@ namespace CppWinFormJoy
         public static int ir_run_worker(Func<int> func) {
             int res = 0;
             Exception error = null;
+            if (ir_worker != null) {
+                // Shouldn't happen: the IR buttons are disabled while the camera runs.
+                trace_note("IR: already running, request ignored");
+                return 0;
+            }
             var t = new System.Threading.Thread(() => {
+                trace_note("IR: thread started");
                 try { res = func(); }
                 catch (Exception ex) { error = ex; }
+                trace_note("IR: thread finished, result " + res + (error != null ? ", error " + error.GetType().Name + ": " + error.Message : ""));
             });
             t.IsBackground = true;
             ir_worker = t;
@@ -1571,9 +1578,13 @@ namespace CppWinFormJoy
             while (!t.Join(10))
                 Application.DoEvents();
             ir_worker = null;
+            trace_note("IR: window thread saw the end");
             ir_ui_flush();
-            if (error != null)
+            trace_note("IR: window updated");
+            if (error != null) {
+                Console.Error.WriteLine("IR camera thread failed: " + error);
                 throw new Exception("IR camera thread failed", error);
+            }
             return res;
         }
 

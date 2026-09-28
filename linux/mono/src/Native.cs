@@ -354,6 +354,19 @@ namespace CppWinFormJoy
             }
         }
 
+        // With -d, mark the steps of an IR camera run in the log, so a hang shows where it stopped.
+        public static void trace_note(string what)
+        {
+            if (!enable_traffic_dump)
+                return;
+            try {
+                traffic_append(String.Format("[{0,10:F1}] NOTE {1} (thread {2})\n\n",
+                    traffic_clock.Elapsed.TotalMilliseconds, what, System.Threading.Thread.CurrentThread.ManagedThreadId));
+            }
+            catch (Exception) {
+            }
+        }
+
         // With JCTOOL_TIMESTAMPS=1 and -d, log any traced step that takes 30ms or more.
         public static long trace_start()
         {

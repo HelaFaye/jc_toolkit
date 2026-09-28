@@ -2180,8 +2180,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         ir_image_config ir_new_config = new ir_image_config();
         int res = 0;
 
+        trace_note("IR: configure (" + (startNewConfig ? "new run" : "live change") + ")");
         this.lbl_IRStatus.Text = "Status: Configuring";
         Application.DoEvents();
+        trace_note("IR: window events processed");
 
         // The IR camera lens has a FoV of 123�. The IR filter is a NIR 850nm wavelength pass filter.
 
