@@ -84,15 +84,25 @@ namespace CppWinFormJoy
                 }
                 Diag("after desktop import");
 
-                // Put Mono's colors back, the same way the import set them
+                // Put Mono's colors back through the theme's color properties (ColorControl, ...),
+                // which the import uses, and System.Drawing's table (older Mono versions)
+                object theme = swf.GetType("System.Windows.Forms.ThemeEngine")
+                    ?.GetProperty("Current", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null);
                 MethodInfo update = typeof(Color).Assembly.GetType("System.Drawing.KnownColors")
                     ?.GetMethod("Update", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                int theme_set = 0;
+                for (int i = 0; i < system_colors.Length; i++) {
+                    Color c = Color.FromArgb(builtin[i]);
+                    PropertyInfo p = theme?.GetType().GetProperty("Color" + system_colors[i],
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (p != null && p.CanWrite && p.PropertyType == typeof(Color)) {
+                        p.SetValue(theme, c);
+                        theme_set++;
+                    }
+                    update?.Invoke(null, new object[] { (int)system_colors[i], builtin[i] });
+                }
                 if (diag)
-                    Console.WriteLine("  KnownColors.Update: " + (update == null ? "not found" : "found"));
-                if (update == null)
-                    return;
-                for (int i = 0; i < system_colors.Length; i++)
-                    update.Invoke(null, new object[] { (int)system_colors[i], builtin[i] });
+                    Console.WriteLine("  Theme colors set: {0}, KnownColors.Update: {1}", theme_set, update == null ? "not found" : "found");
                 Diag("after reset");
             }
             catch (Exception e) {
