@@ -36,6 +36,11 @@ namespace CppWinFormJoy
             return installed.Contains(family);
         }
 
+        public static bool IsInstalledFamily(string family)
+        {
+            return IsInstalled(family);
+        }
+
         public static string MapFamily(string family)
         {
             string mapped;
