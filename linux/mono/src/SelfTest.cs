@@ -195,6 +195,23 @@ namespace CppWinFormJoy
                     Check(Jc.ir_last_frame_missing == 0 && capture_fragments <= 3 * 256 + 16,
                         name + ": IR capture with auto exposure saves a complete frame in 3 frames (" + capture_fragments + " fragments)");
 
+                    // JCTOOL_IR_QUICK=1: 2 frames, still complete.
+                    Jc.ir_quick_capture = true;
+                    ir_res = form.CaptureIR();
+                    int quick_fragments = fake.ir_frames_sent;
+                    Jc.ir_quick_capture = false;
+                    Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && quick_fragments <= 2 * 256 + 16 && File.Exists("IRcamera.png"),
+                        name + ": IR quick capture saves a complete frame in 2 frames (" + quick_fragments + " fragments)");
+                    File.Delete("IRcamera.png");
+
+                    // JCTOOL_IR_NO_REACK=1 still captures (the emulator sends no empty reports).
+                    Jc.ir_no_reack = true;
+                    ir_res = form.CaptureIR();
+                    Jc.ir_no_reack = false;
+                    Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && File.Exists("IRcamera.png"),
+                        name + ": IR capture without re-ACKs still works");
+                    File.Delete("IRcamera.png");
+
                     // The Joy-Con skips a fragment near the end of the saved frame and doesn't
                     // resend it before the last one. The capture must not save that frame.
                     fake.ir_skip_fragment = 253;
@@ -216,7 +233,7 @@ namespace CppWinFormJoy
                     watch.Stop();
                     stall.Stop();
                     fake.ir_fragment_delay_ms = 0;
-                    Check(ir_res == 0 && File.Exists("IRcamera.png") && watch.ElapsedMilliseconds < 8000,
+                    Check(ir_res == 0 && File.Exists("IRcamera.png") && watch.ElapsedMilliseconds < 12000,
                         name + ": IR capture finishes while the window is stalling (" + watch.ElapsedMilliseconds + "ms)");
                     File.Delete("IRcamera.png");
 

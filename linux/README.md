@@ -215,6 +215,21 @@ Writes (each one can be undone from your backup):
 Leave S/N changes, calibration writes and Full Restore until everything above
 works. They behave exactly like on Windows.
 
+## IR camera options (Linux only)
+
+A full-resolution (240x320) frame is 256 fragments, and the Joy-Con sends about
+one every 15-30ms over Bluetooth, so a frame takes 5-9 seconds. Capture waits
+until it has a complete frame after the auto exposure adjustment (3 frames).
+Lower resolutions are much faster (120x160 is a quarter of the data).
+
+Set these when starting the app, e.g. `JCTOOL_IR_QUICK=1 mono build/jctool.exe`:
+
+| Variable | Effect |
+|---|---|
+| `JCTOOL_IR_QUICK=1` | Capture adjusts the exposure during the first frame and saves the second (2 frames instead of 3). |
+| `JCTOOL_IR_NO_REACK=1` | Experiment: don't answer the Joy-Con's "no new data" reports. May be faster or slower; compare with `JCTOOL_TIMESTAMPS=1` and `-d`. |
+| `JCTOOL_TIMESTAMPS=1` | With `-d`, add millisecond timestamps to `traffic_log.txt`. |
+
 ## Troubleshooting
 
 | Symptom | Fix |

@@ -1423,6 +1423,12 @@ namespace CppWinFormJoy
         // never slows the transfer down.
         public static volatile System.Threading.Thread ir_worker;
         public static int ir_last_frame_missing; // fragments missing from the last finished IR frame
+
+        // Linux options (environment variables):
+        // JCTOOL_IR_QUICK=1    Capture adjusts the exposure during the first frame and saves the second.
+        // JCTOOL_IR_NO_REACK=1 Experiment: don't re-send the ACK when the Joy-Con reports "no new data".
+        public static bool ir_quick_capture = Environment.GetEnvironmentVariable("JCTOOL_IR_QUICK") == "1";
+        public static bool ir_no_reack = Environment.GetEnvironmentVariable("JCTOOL_IR_NO_REACK") == "1";
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
         static string ir_pending_help;
@@ -1614,7 +1620,9 @@ namespace CppWinFormJoy
             // frame (seen as a bar at the image edge). The saved frame must now be complete.
             u8* frag_seen = stackalloc u8[256];
             int incomplete_retries = 0;
+            bool ir_exposure_adjusted = false;
             memset(frag_seen, 0, 256);
+            trace_note("IR: quick capture " + (ir_quick_capture ? "on" : "off") + ", re-ACK empty reports " + (ir_no_reack ? "off" : "on"));
             int max_pixels = ((ir_max_frag_no < 218 ? ir_max_frag_no : 217) + 1) * 300;
             int white_pixels_percent = 0;
 
@@ -1686,9 +1694,10 @@ namespace CppWinFormJoy
                             // capture waits for a complete frame, adjust only once, so the retry
                             // frames can come through whole. Streaming adjusts every frame as before.
                             if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0
-                                && (initialization == 0 || incomplete_retries == 0)) {
+                                && (initialization == 0 || !ir_exposure_adjusted)) {
                                 white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                                 ir_sensor_auto_exposure(white_pixels_percent);
+                                ir_exposure_adjusted = true;
                             }
 
                             // Status percentage
@@ -1834,6 +1843,15 @@ namespace CppWinFormJoy
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
                         frag_seen[got_frag_no] = 1;
 
+                        // Linux, JCTOOL_IR_QUICK=1: adjust the exposure on the first fragment of
+                        // the first frame, so that frame takes the dropped fragment and the
+                        // second frame is saved (2 frames instead of 3).
+                        if (ir_quick_capture && enable_IRAutoExposure && initialization == 2 && !ir_exposure_adjusted) {
+                            white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
+                            ir_sensor_auto_exposure(white_pixels_percent);
+                            ir_exposure_adjusted = true;
+                        }
+
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
 
@@ -1886,7 +1904,8 @@ namespace CppWinFormJoy
                     }
                 }
                 // Empty IR report. Send Ack again. Otherwise, it fallbacks to high latency mode (30ms per data fragment)
-                else if (buf_reply[0] == 0x31) {
+                // Linux, JCTOOL_IR_NO_REACK=1 (experiment): don't re-send the ACK for "no new data" (0xFF).
+                else if (buf_reply[0] == 0x31 && !(ir_no_reack && buf_reply[49] == 0xFF)) {
                     // ACK for fragment
                     hdr->timer = (u8)(timming_byte & 0xF);
                     timming_byte++;
