@@ -237,7 +237,7 @@ It connects to the controller on start. Menu:
 | 7 | Colors: view and change body/buttons (and Pro Controller grips) |
 | 8, 9 | Backup the SPI flash; restore colors, S/N, user calibration, factory-reset user calibration, or a full restore (with the window's checks) |
 | 10 | Change the S/N (Joy-Con), or restore it from the backup inside the controller |
-| 11 | Edit user stick / 6-axis calibration and the stick device parameters |
+| 11 | Edit user stick / 6-axis calibration (with the guided stick calibration) and the stick device parameters |
 | 12 | Live button, stick and 6-axis test |
 | 13 | HD Rumble player (.bnvib, .jcvib, with equalizer and loops) and the two tunes |
 | 14 | IR camera (Joy-Con R): every setting of the window, Capture (IRcamera.png), Stream (IRstream.png, with live exposure/gain/register changes), Quick capture, and a color preview in the terminal |
@@ -250,6 +250,23 @@ for confirmation first, like the window.
 The protocol code (`cli/jc_core.cpp`) is ported from the Linux build's `JcTool.cs`, with
 the same Linux fixes. `cli/test/run_tests.sh` tests every menu against an emulated
 controller (no hardware needed).
+
+## Calibration (Linux additions)
+
+**Status:** the right end of the menu bar shows `Factory calibration`, or `User calibration`
+when a user stick or 6-axis calibration overrides the factory one (hover for which). Click
+it to open the calibration editor with the controller's values. The CLI's device info (2)
+shows the same.
+
+**Guided stick calibration:** More... > Edit Calibration, then **Calibrate..** in a stick box.
+1. Let go of the stick; Next is enabled once it rests still. Click it to take the center.
+2. Rotate the stick slowly along its edge, pushed all the way, until every direction is
+   covered (2-3 turns). Click Done.
+
+The measured center and range fill the box's fields and turn its user calibration on.
+Nothing is written yet: check the values, then click **Write Cal** (it writes all the
+fields, which the wizard loads from the controller first). The CLI offers the same in
+menu 11 when you set a stick user calibration.
 
 ## Link health (status bar, Linux only)
 

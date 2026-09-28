@@ -12,6 +12,8 @@
 
 #include <deque>
 #include <string>
+#include <chrono>
+#include <cmath>
 #include <vector>
 
 #include "cli/jc_core.h"
@@ -650,6 +652,23 @@ void cmd_device_info(void) {
     show_battery();
     show_temperature();
     show_colors();
+    // Calibration in use: a user calibration (magic B2 A1) overrides the factory one
+    u8 user_cal[22], sensor_cal[2];
+    memset(user_cal, 0xFF, sizeof(user_cal));
+    memset(sensor_cal, 0xFF, sizeof(sensor_cal));
+    get_spi_data(0x8010, 22, user_cal);
+    get_spi_data(0x8026, 2, sensor_cal);
+    std::string cal;
+    if (handle_type != JOYCON_R && user_cal[0] == 0xB2 && user_cal[1] == 0xA1)
+        cal += handle_type == PROCON ? "left stick, " : "stick, ";
+    if (handle_type != JOYCON_L && user_cal[11] == 0xB2 && user_cal[12] == 0xA1)
+        cal += handle_type == PROCON ? "right stick, " : "stick, ";
+    if (sensor_cal[0] == 0xB2 && sensor_cal[1] == 0xA1)
+        cal += "6-axis, ";
+    if (cal.empty())
+        printf("Calibration: factory\n");
+    else
+        printf("Calibration: user (%s)\n", cal.substr(0, cal.size() - 2).c_str());
 }
 
 void cmd_battery_status(void) {
@@ -784,6 +803,102 @@ static void edit_stick(const char *name, stick_cal &c) {
     c.y_plus   = ask_int("  Y maximum", c.y_plus, 0, 0xFFF);
 }
 
+// Guided stick calibration (Linux addition, like the window's Calibrate.. button): measures the
+// center with the stick at rest, then the range while it's rotated along its edge.
+static bool stick_wizard(bool left, stick_cal &c) {
+    const int Sectors = 24, Samples = 30, MaxSpread = 0x60, MinHalf = 0x300;
+    u8 mode = 0x30;
+    u8 reply[49];
+    send_subcommand(0x03, &mode, 1, reply);
+    int rx[Samples], ry[Samples], count = 0, pos = 0;
+    int x = -1, y = -1, cx = 0, cy = 0, lx = 0, hx = 0, ly = 0, hy = 0;
+    bool sector[Sectors] = { false };
+    int step = 0;
+    bool ok = false;
+    auto stable = [&]() {
+        if (count < Samples) return false;
+        int a = 4095, b = 0, e = 4095, f = 0;
+        for (int i = 0; i < Samples; i++) {
+            a = std::min(a, rx[i]); b = std::max(b, rx[i]);
+            e = std::min(e, ry[i]); f = std::max(f, ry[i]);
+        }
+        return b - a <= MaxSpread && f - e <= MaxSpread;
+    };
+    auto sectors = [&]() { int n = 0; for (bool d : sector) n += d; return n; };
+    printf("\n1/2  Let go of the stick so it rests at its center, then press Enter (q + Enter: cancel).\n");
+    auto last_print = std::chrono::steady_clock::now();
+    while (true) {
+        u8 buf[49];
+        int res = jc_hid_read_timeout(handle, buf, 49, 20);
+        if (res > 12 && (buf[0] == 0x30 || buf[0] == 0x21)) {
+            u8 *d = buf + (left ? 6 : 9);
+            x = d[0] | ((d[1] & 0xF) << 8);
+            y = (d[1] >> 4) | (d[2] << 4);
+            if (step == 0) {
+                rx[pos] = x; ry[pos] = y;
+                pos = (pos + 1) % Samples;
+                count = std::min(count + 1, Samples);
+            }
+            else {
+                lx = std::min(lx, x); hx = std::max(hx, x);
+                ly = std::min(ly, y); hy = std::max(hy, y);
+                int dx = x - cx, dy = y - cy;
+                if (dx * dx + dy * dy > MinHalf * MinHalf) {
+                    double a = atan2((double)dy, (double)dx) + M_PI;
+                    sector[std::min(Sectors - 1, (int)(a / (2 * M_PI) * Sectors))] = true;
+                }
+            }
+        }
+        auto now = std::chrono::steady_clock::now();
+        if (x >= 0 && now - last_print > std::chrono::milliseconds(100)) {
+            last_print = now;
+            if (step == 0)
+                printf("\r  Now: X %03X  Y %03X  %s   ", x, y, stable() ? "(at rest)" : "(hold still)");
+            else
+                printf("\r  Now: X %03X  Y %03X  X %03X-%03X  Y %03X-%03X  directions %d/%d   ", x, y, lx, hx, ly, hy, sectors(), Sectors);
+            fflush(stdout);
+        }
+        if (!stdin_has_line())
+            continue;
+        char line[64];
+        if (!fgets(line, sizeof(line), stdin) || line[0] == 'q')
+            break;
+        if (step == 0) {
+            if (!stable()) {
+                printf("\n  The stick isn't at rest yet (or no reports). Let go of it and press Enter again.\n");
+                continue;
+            }
+            int sx = 0, sy = 0;
+            for (int i = 0; i < Samples; i++) { sx += rx[i]; sy += ry[i]; }
+            cx = (sx + Samples / 2) / Samples;
+            cy = (sy + Samples / 2) / Samples;
+            lx = hx = cx; ly = hy = cy;
+            step = 1;
+            printf("\n2/2  Slowly rotate the stick along its outer edge, pushed all the way, until every\n"
+                   "     direction is covered (2-3 turns). Then press Enter.\n");
+            continue;
+        }
+        if (sectors() < Sectors) {
+            printf("\n  Not every direction yet (%d/%d). Keep rotating, then press Enter.\n", sectors(), Sectors);
+            continue;
+        }
+        if (cx - lx < MinHalf || hx - cx < MinHalf || cy - ly < MinHalf || hy - cy < MinHalf) {
+            printf("\n  The range is too small. Push the stick all the way to its edge while rotating.\n");
+            continue;
+        }
+        c.x_minus = lx; c.x_center = cx; c.x_plus = hx;
+        c.y_minus = ly; c.y_center = cy; c.y_plus = hy;
+        printf("\n[+] Measured: X %03X / %03X / %03X   Y %03X / %03X / %03X (min / center / max)\n", lx, cx, hx, ly, cy, hy);
+        ok = true;
+        break;
+    }
+    mode = 0x3F;
+    send_subcommand(0x03, &mode, 1, reply);
+    if (!ok)
+        printf("\nCalibration cancelled.\n");
+    return ok;
+}
+
 static void encode_stick(u8 *out, const stick_cal &c, bool left) {
     u16 pair[2];
     // Center X,Y
@@ -825,11 +940,17 @@ void cmd_edit_calibration(void) {
         printf("\nA user calibration that is disabled is erased (the factory one is used).\n");
         if (left) {
             l_on = ask_yes_no(l_on ? "Keep a left stick user calibration? (currently set)" : "Set a left stick user calibration? (currently none)");
-            if (l_on) edit_stick("Left stick", lc);
+            if (l_on) {
+                if (!ask_yes_no("Measure it with the guided calibration? (n: type the values)") || !stick_wizard(true, lc))
+                    edit_stick("Left stick", lc);
+            }
         }
         if (right) {
             r_on = ask_yes_no(r_on ? "Keep a right stick user calibration? (currently set)" : "Set a right stick user calibration? (currently none)");
-            if (r_on) edit_stick("Right stick", rc);
+            if (r_on) {
+                if (!ask_yes_no("Measure it with the guided calibration? (n: type the values)") || !stick_wizard(false, rc))
+                    edit_stick("Right stick", rc);
+            }
         }
         s_on = ask_yes_no(s_on ? "Keep a 6-axis user calibration? (currently set)" : "Set a 6-axis user calibration? (currently none)");
         if (s_on) {

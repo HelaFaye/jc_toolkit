@@ -176,7 +176,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         // from what the app sent and received (it doesn't poll the controller for it).
         this.toolStripLabel_link = new ToolStripLabel();
         this.toolStripLabel_link.Alignment = ToolStripItemAlignment.Right;
-        this.toolStripLabel_link.Font      = this.toolStripLabel_temp.Font;
+        this.toolStripLabel_link.Font      = new System.Drawing.Font(this.toolStripLabel_temp.Font.FontFamily, 8.25F);
         this.toolStripLabel_link.ForeColor = System.Drawing.Color.FromArgb(251, 251, 251);
         this.toolStripLabel_link.Margin    = new System.Windows.Forms.Padding(0);
         this.toolStripLabel_link.Padding   = new System.Windows.Forms.Padding(2, 0, 6, 0);
@@ -185,6 +185,44 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.toolStripLabel_link.Text      = "Link idle";
         this.toolStripLabel_link.ToolTipText = "Link health, over the last second (Linux)";
         this.toolStrip1.Items.Add(this.toolStripLabel_link);
+        // Linux: calibration in use, at the right of the menu bar (the status bar is full).
+        // Click: open the calibration editor with the controller's values.
+        this.toolStripLabel_cal = new ToolStripMenuItem();
+        this.toolStripLabel_cal.Alignment = ToolStripItemAlignment.Right;
+        this.toolStripLabel_cal.Font      = this.menuToolStripMenuItem.Font;
+        this.toolStripLabel_cal.ForeColor = System.Drawing.Color.FromArgb(251, 251, 251);
+        this.toolStripLabel_cal.Name      = "toolStripLabel_cal";
+        this.toolStripLabel_cal.Text      = "";
+        this.toolStripLabel_cal.Click    += (sender, e) => {
+            if (option_is_on != 7)
+                editCalibrationToolStripMenuItem_Click(sender, e);
+            btn_refreshUserCal_Click(sender, e);
+        };
+        this.menuStrip1.Items.Add(this.toolStripLabel_cal);
+
+        // Linux: stick calibration wizard, one button per stick box (the label is shortened to make room).
+        foreach (bool left in new[] { true, false }) {
+            GroupBox box = left ? this.grpBox_leftStickUCal : this.grpBox_rightStickUCal;
+            Label help = left ? this.lbl_userCalMinCenterMax : this.lbl_userCalMinCenterMax2;
+            help.Text = "Min / Center / Max:";
+            help.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            help.Size = new System.Drawing.Size(110, 13);
+            var btn = new Button();
+            btn.Text      = "Calibrate..";
+            btn.Font      = new System.Drawing.Font("Segoe UI", 8.25F);
+            btn.FlatStyle = FlatStyle.Flat;
+            btn.BackColor = System.Drawing.Color.FromArgb(85, 85, 85);
+            btn.FlatAppearance.BorderColor = btn.BackColor;
+            btn.UseVisualStyleBackColor = false;
+            btn.ForeColor = System.Drawing.Color.FromArgb(9, 255, 206);
+            btn.Location  = new System.Drawing.Point(120, 14);
+            btn.Size      = new System.Drawing.Size(78, 27); // Mono draws the text only if a whole line fits
+            btn.Click    += (sender, e) => run_stick_cal_wizard(left);
+            box.Controls.Add(btn);
+            this.toolTip1.SetToolTip(btn, "Measure this stick's center and range (guided).\nFills in the values; click Write Cal to save them.");
+        }
+        if (check_connection_ok && handle_type != NOTHING)
+            update_cal_status();
         link_take_stats();
         this.timer_link = new Timer { Interval = 1000 };
         this.timer_link.Tick += (sender, e) => update_link_health();
@@ -271,7 +309,40 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         update_battery();
         update_temperature();
         update_colors_from_spi(!check_connection);
+        update_cal_status();
     }
+
+    // Linux: which calibration the controller uses, in the status bar. User calibration
+    // (SPI 0x8010 sticks, 0x8026 6-axis, magic B2 A1) overrides the factory one when present.
+    internal void update_cal_status() {
+        if (this.toolStripLabel_cal == null)
+            return; // Called by full_refresh() before the constructor adds the label
+        if (handle == IntPtr.Zero && fake == null) {
+            this.toolStripLabel_cal.Text = "";
+            return;
+        }
+        u8* user_cal = stackalloc u8[22];
+        u8* sensor_cal = stackalloc u8[2];
+        memset(user_cal, 0xFF, 22);
+        memset(sensor_cal, 0xFF, 2);
+        get_spi_data(0x8010, 22, user_cal);
+        get_spi_data(0x8026, 2, sensor_cal);
+        bool left  = handle_type != JOYCON_R && user_cal[0] == 0xB2 && user_cal[1] == 0xA1;
+        bool right = handle_type != JOYCON_L && user_cal[11] == 0xB2 && user_cal[12] == 0xA1;
+        bool imu   = sensor_cal[0] == 0xB2 && sensor_cal[1] == 0xA1;
+        bool any   = left || right || imu;
+        this.toolStripLabel_cal.Text = any ? "User calibration" : "Factory calibration";
+        this.toolStripLabel_cal.ForeColor = any ? System.Drawing.Color.FromArgb(0, 255, 234) : link_ok;
+        string tip = "Calibration in use (click to edit):\n";
+        if (handle_type != JOYCON_R)
+            tip += "  " + (handle_type == PROCON ? "Left stick" : "Stick") + ": " + (left ? "user" : "factory") + "\n";
+        if (handle_type != JOYCON_L)
+            tip += "  " + (handle_type == PROCON ? "Right stick" : "Stick") + ": " + (right ? "user" : "factory") + "\n";
+        tip += "  6-axis sensor: " + (imu ? "user" : "factory");
+        this.toolStripLabel_cal.ToolTipText = tip;
+    }
+
+    internal string CalText { get { return this.toolStripLabel_cal.Text; } }
 
     private void btn_writeColorsToSpi_Click(System.Object sender, System.EventArgs e) {
         if (check_if_connected())
@@ -596,6 +667,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     }
 
     private ToolStripLabel toolStripLabel_link;
+    private ToolStripMenuItem toolStripLabel_cal;
     private Timer timer_link;
     private int link_errors_total, link_timeouts_total;
     private long link_longest_gap_total;
@@ -1333,6 +1405,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
                 send_rumble();
 
                 if (error == 0) {
+                    update_cal_status();
                     MessageBox.Show("The user calibration was restored!", "Calibration Restore Finished!",
                         MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                 }
@@ -1361,6 +1434,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
                 send_rumble();
 
                 if (error == 0) {
+                    update_cal_status();
                     MessageBox.Show("The user calibration was factory resetted!", "Calibration Reset Finished!",
                         MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                 }
@@ -2729,12 +2803,61 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     }
 
 
+    // Linux: guided stick calibration. Loads the current values first (Write Cal writes all of
+    // them), then fills in the measured stick.
+    private void run_stick_cal_wizard(bool left) {
+        if (check_if_connected())
+            return;
+        btn_refreshUserCal_Click(null, EventArgs.Empty);
+        using (var wizard = new StickCalWizard(left, this)) {
+            if (wizard.ShowDialog(this) != DialogResult.OK)
+                return;
+            apply_stick_cal(left, wizard.Result);
+        }
+        MessageBox.Show("The measured values were filled in.\n\nClick Write Cal to save them to the controller.",
+            "Stick calibration", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    internal void RefreshUserCal() { btn_refreshUserCal_Click(null, EventArgs.Empty); }
+    internal int[] UserCalFields(bool left) {
+        NumericUpDown[] f = left
+            ? new[] { numeric_leftUserCal_x_minus, numeric_leftUserCal_x_center, numeric_leftUserCal_x_plus,
+                      numeric_leftUserCal_y_minus, numeric_leftUserCal_y_center, numeric_leftUserCal_y_plus }
+            : new[] { numeric_rightUserCal_x_minus, numeric_rightUserCal_x_center, numeric_rightUserCal_x_plus,
+                      numeric_rightUserCal_y_minus, numeric_rightUserCal_y_center, numeric_rightUserCal_y_plus };
+        return Array.ConvertAll(f, n => (int)n.Value);
+    }
+
+    // r: min, center, max for X then Y (raw)
+    internal void apply_stick_cal(bool left, int[] r) {
+        NumericUpDown[] f = left
+            ? new[] { numeric_leftUserCal_x_minus, numeric_leftUserCal_x_center, numeric_leftUserCal_x_plus,
+                      numeric_leftUserCal_y_minus, numeric_leftUserCal_y_center, numeric_leftUserCal_y_plus }
+            : new[] { numeric_rightUserCal_x_minus, numeric_rightUserCal_x_center, numeric_rightUserCal_x_plus,
+                      numeric_rightUserCal_y_minus, numeric_rightUserCal_y_center, numeric_rightUserCal_y_plus };
+        for (int i = 0; i < 6; i++)
+            f[i].Value = Math.Max(f[i].Minimum, Math.Min(f[i].Maximum, r[i]));
+        (left ? checkBox_enableLeftUserCal : checkBox_enableRightUserCal).Checked = true;
+        btn_writeUserCal.Enabled = true;
+    }
+
     private void btn_writeUserCal_Click(System.Object  sender, System.EventArgs  e) {
         if (check_if_connected())
             return;
 
         if (MessageBox.Show("Are you sure you want to continue?",
             "Warning!", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == System.Windows.Forms.DialogResult.Yes) {
+            int res = write_user_cal_fields();
+            if (res == 0)
+                MessageBox.Show("The user calibration was written to SPI!", "CTCaer's Joy-Con Toolkit - Write Success!", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
+            else
+                MessageBox.Show("Failed to write user calibration to SPI!\n\nPlease try again..", "CTCaer's Joy-Con Toolkit - Write Failed!", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+        }
+    }
+
+    // Writes the editor's user calibration fields (Linux: split out of the button, for the self-test).
+    internal int write_user_cal_fields() {
+        {
             u8* user_stick_cal = stackalloc u8[22];
             u8* user_sensor_cal = stackalloc u8[26];
             u16* decoded_stick_pair = stackalloc u16[2];
@@ -2801,12 +2924,9 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
                 Sleep(100);
                 res = write_spi_data(0x8026, 26, user_sensor_cal);
             }
-            if (res == 0)
-                MessageBox.Show("The user calibration was written to SPI!", "CTCaer's Joy-Con Toolkit - Write Success!", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
-            else
-                MessageBox.Show("Failed to write user calibration to SPI!\n\nPlease try again..", "CTCaer's Joy-Con Toolkit - Write Failed!", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+            update_cal_status();
+            return res;
         }
-
     }
 
 

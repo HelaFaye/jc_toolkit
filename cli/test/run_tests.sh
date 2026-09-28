@@ -95,12 +95,22 @@ run pro '10\n0\n'
 check "S/N: not supported on the Pro Controller" "grep -q 'not supported for Pro Controllers' out.txt"
 
 # --- Calibration editing
-run r '11\n1\ny\n1000\n2000\n3000\n1100\n2100\n3100\nn\ny\n0\n'
+run r '11\n1\ny\nn\n1000\n2000\n3000\n1100\n2100\n3100\nn\ny\n0\n'
 check "user calibration: right stick written" "[ \"\$(flash_hex 0x801B 2)\" = b2a1 ]"
 cp flash.bin usercal.bin
 run r '6\n0\n' JCFAKE_SPI_IN=usercal.bin
 check "user calibration: reads back as entered" "grep -q 'Right stick: center (2000, 2100)  X \[1000 - 3000\]  Y \[1100 - 3100\]' out.txt"
 check "user calibration: disabled 6-axis erased" "[ \"\$(flash_hex 0x8026 2)\" = ffff ]"
+run r '2\n0\n' JCFAKE_SPI_IN=usercal.bin
+check "device info: user calibration shown" "grep -q 'Calibration: user (stick)' out.txt"
+run r '2\n0\n'
+check "device info: factory calibration shown" "grep -q 'Calibration: factory' out.txt"
+{ printf '11\n1\ny\ny\n'; sleep 1.5; printf '\n'; sleep 5; printf '\nn\ny\n0\n'; } | env JCFAKE_TYPE=r JCFAKE_STICK=1 JCFAKE_SPI_OUT=flash.bin ./jctool-cli-fake > out.txt 2>&1
+check "guided stick calibration measures and writes" "grep -q 'Measured: X 320 / 7D0 / C80   Y 384 / 834 / CE4' out.txt && [ \"\$(flash_hex 0x801B 2)\" = b2a1 ]"
+cp flash.bin wizard.bin
+run r '6\n0\n' JCFAKE_SPI_IN=wizard.bin
+check "guided stick calibration reads back" "grep -q 'Right stick: center (2000, 2100)  X \[800 - 3200\]  Y \[900 - 3300\]' out.txt"
+
 run r '11\n2\n150\n3000\ny\n0\n'
 check "stick device parameters written" "[ \"\$(flash_hex 0x6089 3)\" = 9680bb ]"
 

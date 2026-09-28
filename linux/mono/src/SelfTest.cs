@@ -168,6 +168,52 @@ namespace CppWinFormJoy
                 form.RefreshPreview();
                 Check(form.PreviewImage != null, name + " window: preview can be redrawn repeatedly");
 
+                // Calibration: status in the menu bar, guided stick calibration, write and read back.
+                Check(form.CalText == "Factory calibration", name + ": calibration status shown (" + form.CalText + ")");
+                bool left_stick = type != Jc.JOYCON_R;
+                int[] cal = null;
+                using (var wizard = new StickCalWizard(left_stick, form)) {
+                    fake.stick_raw = new[] { 2000, 2100 };
+                    wizard.Show();
+                    var clock = System.Diagnostics.Stopwatch.StartNew();
+                    while (!wizard.NextEnabled && clock.ElapsedMilliseconds < 3000) {
+                        Application.DoEvents();
+                        System.Threading.Thread.Sleep(5);
+                    }
+                    bool center_ok = wizard.NextEnabled;
+                    wizard.Next();
+                    // Three turns along the edge: X 800-3200, Y 900-3300
+                    for (int a = 0; a <= 3 * 360; a += 5) {
+                        double r = a * Math.PI / 180;
+                        fake.stick_raw = new[] { 2000 + (int)Math.Round(1200 * Math.Cos(r)), 2100 + (int)Math.Round(1200 * Math.Sin(r)) };
+                        var step_clock = System.Diagnostics.Stopwatch.StartNew();
+                        while (step_clock.ElapsedMilliseconds < 20) {
+                            Application.DoEvents();
+                            System.Threading.Thread.Sleep(2);
+                        }
+                    }
+                    bool rotate_ok = wizard.NextEnabled;
+                    wizard.Next();
+                    cal = wizard.Result;
+                    fake.stick_raw = null;
+                    Check(center_ok && rotate_ok && cal != null && Math.Abs(cal[0] - 800) <= 8 && cal[1] == 2000 && Math.Abs(cal[2] - 3200) <= 8
+                        && Math.Abs(cal[3] - 900) <= 8 && cal[4] == 2100 && Math.Abs(cal[5] - 3300) <= 8,
+                        name + ": stick calibration wizard measures center and range (" + (cal == null ? "none" : string.Join(",", cal)) + ")");
+                }
+                if (cal != null) {
+                    form.RefreshUserCal();
+                    form.apply_stick_cal(left_stick, cal);
+                    int wres = form.write_user_cal_fields();
+                    int magic = left_stick ? 0x8010 : 0x801B;
+                    Check(wres == 0 && fake.spi[magic] == 0xB2 && fake.spi[magic + 1] == 0xA1 && form.CalText == "User calibration",
+                        name + ": user stick calibration written, status shows it");
+                    form.apply_stick_cal(left_stick, new[] { 0, 0, 0, 0, 0, 0 });
+                    form.RefreshUserCal();
+                    int[] back = form.UserCalFields(left_stick);
+                    Check(string.Join(",", back) == string.Join(",", cal),
+                        name + ": user stick calibration reads back as written (" + string.Join(",", back) + ")");
+                }
+
                 string file = "selftest_spi_dump.bin";
                 Jc.cancel_spi_dump = false;
                 int res = Jc.dump_spi(file);

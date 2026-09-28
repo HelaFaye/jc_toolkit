@@ -98,9 +98,16 @@ namespace CppWinFormJoy
             r[0] = id;
             r[1] = timer++;
             r[2] = 0x8E;            // battery full, Bluetooth
-            // Sticks at their calibrated centers
+            // Sticks at their calibrated centers, or where a test put them
             r[6] = 0x6F; r[7] = 0x8C; r[8] = 0x77;
             r[9] = 0xF2; r[10] = 0xD5; r[11] = 0x7D;
+            int[] pos = stick_raw;
+            if (pos != null)
+                for (int o = 6; o <= 9; o += 3) {
+                    r[o]     = (byte)(pos[0] & 0xFF);
+                    r[o + 1] = (byte)(((pos[0] >> 8) & 0xF) | ((pos[1] & 0xF) << 4));
+                    r[o + 2] = (byte)(pos[1] >> 4);
+                }
             return r;
         }
 
@@ -112,6 +119,10 @@ namespace CppWinFormJoy
             Array.Copy(data, 0, r, 15, Math.Min(data.Length, 49 - 15));
             replies.Enqueue(r);
         }
+
+        public volatile int[] stick_raw;   // Raw 12-bit X, Y for both sticks in input reports (null: centered)
+        readonly System.Diagnostics.Stopwatch report_clock = System.Diagnostics.Stopwatch.StartNew();
+        long last_report_ms;
 
         // Calls that overlapped another call (hidapi isn't thread safe for one device).
         public int concurrent_calls;
@@ -324,7 +335,13 @@ namespace CppWinFormJoy
                 r = McuReport(0xFF);
             }
             else if (input_mode == 0x30) {
-                Thread.Sleep(15);
+                // One report every 15ms: a read that doesn't wait gets one only if it's due
+                long now = report_clock.ElapsedMilliseconds;
+                if (milliseconds == 0 && now - last_report_ms < 15)
+                    return 0;
+                if (milliseconds != 0)
+                    Thread.Sleep(15);
+                last_report_ms = report_clock.ElapsedMilliseconds;
                 r = NewReport(0x30, 49);
                 r[3] = (byte)((tick++ / 20) % 2 == 0 ? 0x08 : 0x00);   // blink the A button
                 for (int i = 13; i < 49; i++)

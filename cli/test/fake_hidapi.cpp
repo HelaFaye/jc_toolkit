@@ -13,6 +13,7 @@
 #include <hidapi/hidapi.h>
 
 #include <algorithm>
+#include <cmath>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -35,6 +36,8 @@ struct FakeJoyCon {
     u8 mac[6] = { 0x98, 0xB6, 0xE9, 0x12, 0x34, 0x56 };
     std::deque<std::vector<u8>> replies;
     u8 input_mode = 0x3F;
+    bool stick_path = false;
+    int stick_reports = 0;
     bool imu_on = false;
     u8 timer = 0;
     int tick = 0;
@@ -267,6 +270,21 @@ struct FakeJoyCon {
             r[3] = (tick++ / 20) % 2 == 0 ? 0x08 : 0x00;   // blink the A button
             for (int i = 13; i < 49; i++)
                 r[i] = (u8)(i * 7 + tick);
+            if (stick_path) {
+                // JCFAKE_STICK=1: both sticks at rest at (2000, 2100) for 150 reports (~2.3s), then 3 turns
+                // along the edge (X 800-3200, Y 900-3300) at 5 degrees per report, then at rest.
+                int n = stick_reports++, x = 2000, y = 2100;
+                if (n >= 150 && n < 150 + 216) {
+                    double a = (n - 150) * 5 * 3.14159265358979 / 180;
+                    x = 2000 + (int)lround(1200 * cos(a));
+                    y = 2100 + (int)lround(1200 * sin(a));
+                }
+                for (int o = 6; o <= 9; o += 3) {
+                    r[o]     = x & 0xFF;
+                    r[o + 1] = ((x >> 8) & 0xF) | ((y & 0xF) << 4);
+                    r[o + 2] = y >> 4;
+                }
+            }
         }
         else {
             if (milliseconds > 0)
@@ -299,6 +317,7 @@ int HID_API_EXPORT hid_init(void) {
             fclose(f);
         }
     }
+    fake.stick_path = getenv("JCFAKE_STICK") != nullptr;
     const char *stuck = getenv("JCFAKE_IR_STUCK");
     if (stuck)
         fake.ir_stuck_runs = atoi(stuck);
