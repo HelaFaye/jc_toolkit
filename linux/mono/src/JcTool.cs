@@ -1681,7 +1681,12 @@ namespace CppWinFormJoy
 
                             // Auto exposure.
                             // TODO: Fix placement, so it doesn't drop next fragment.
-                            if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0) {
+                            // Linux: the Joy-Con answers the exposure change in place of a fragment
+                            // and doesn't resend it, so that frame is always incomplete. While a
+                            // capture waits for a complete frame, adjust only once, so the retry
+                            // frames can come through whole. Streaming adjusts every frame as before.
+                            if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0
+                                && (initialization == 0 || incomplete_retries == 0)) {
                                 white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                                 ir_sensor_auto_exposure(white_pixels_percent);
                             }

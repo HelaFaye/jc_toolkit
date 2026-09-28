@@ -42,7 +42,11 @@ namespace CppWinFormJoy
         public int ir_fragment_delay_ms;
         public int ir_skip_fragment = -1;  // >= 0: skip this fragment once, in the frame after the first
         public bool ir_ignore_resend;      // carry on after a skip instead of resending, like a real Joy-Con often does
-        int ir_last_frag; // > 0: pace IR fragments like real hardware
+        int ir_last_frag;
+        // A real Joy-Con answers an IR register write during a transfer in place of the next
+        // fragment, skips that fragment and ignores the request to resend it.
+        bool ir_skip_after_register_write;
+        bool ir_skipped_for_register_write; // > 0: pace IR fragments like real hardware
 
         public FakeJoyCon(int type)
         {
@@ -195,6 +199,8 @@ namespace CppWinFormJoy
             }
             else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
                 ir_register_writes++;
+                if (mcu_state == 5 && ir_frames_sent > 0)
+                    ir_skip_after_register_write = true;
                 ir_register_write_thread = Thread.CurrentThread.ManagedThreadId;
                 r[15] = 0x13;
                 r[16] = 0x00;
@@ -213,11 +219,17 @@ namespace CppWinFormJoy
             else if (data[10] == 0x03 && data[11] == 0x00 && mcu_state == 5 && ir_mode != 0) {
                 // IR fragment ACK: send the next fragment of a test pattern (diagonal gradient)
                 int frag = data[12] == 0x01 ? data[13] : (ir_frames_sent == 0 ? 0 : (data[14] + 1) % (ir_max_frag + 1));
-                if (data[12] == 0x01 && ir_ignore_resend)
+                if (data[12] == 0x01 && (ir_ignore_resend || ir_skipped_for_register_write))
                     frag = (ir_last_frag + 1) % (ir_max_frag + 1);
                 if (frag == ir_skip_fragment && ir_frames_sent > ir_max_frag + 1) {
                     frag++;
                     ir_skip_fragment = -1;
+                }
+                ir_skipped_for_register_write = false;
+                if (ir_skip_after_register_write && data[12] != 0x01 && ir_frames_sent > 0) {
+                    frag = (frag + 1) % (ir_max_frag + 1);
+                    ir_skip_after_register_write = false;
+                    ir_skipped_for_register_write = true;
                 }
                 ir_last_frag = frag;
                 var r = McuReport(0x03);

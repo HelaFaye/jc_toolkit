@@ -181,6 +181,7 @@ namespace CppWinFormJoy
                 if (type == Jc.JOYCON_R) {
                     File.Delete("IRcamera.png");
                     int ir_res = form.CaptureIR();
+                    int capture_fragments = fake.ir_frames_sent;
                     Check(ir_res == 0 && File.Exists("IRcamera.png") && fake.ir_frames_sent >= 256,
                         name + ": IR camera capture reassembles a 240x320 frame and saves IRcamera.png");
                     if (File.Exists("IRcamera.png")) {
@@ -188,6 +189,11 @@ namespace CppWinFormJoy
                             Check(img.Width == 240 && img.Height == 320, name + ": IRcamera.png is 240x320 (rotated like on Windows)");
                         File.Delete("IRcamera.png");
                     }
+
+                    // Auto exposure (always on for Capture) makes the Joy-Con drop a fragment; the
+                    // capture must still save a complete frame without running out its retries.
+                    Check(Jc.ir_last_frame_missing == 0 && capture_fragments <= 3 * 256 + 16,
+                        name + ": IR capture with auto exposure saves a complete frame in 3 frames (" + capture_fragments + " fragments)");
 
                     // The Joy-Con skips a fragment near the end of the saved frame and doesn't
                     // resend it before the last one. The capture must not save that frame.
