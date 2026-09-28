@@ -155,6 +155,9 @@ namespace CppWinFormJoy
             catch (Exception) {
             }
 
+            // Readable dialogs with a dark desktop theme (see SystemColorsFix.cs)
+            SystemColorsFix.UseBuiltInColors();
+
             if (args.Length > 0 && args[0] == "--selftest")
                 return SelfTest.Run();
 

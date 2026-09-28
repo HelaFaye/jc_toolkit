@@ -283,6 +283,7 @@ Experiments (off by default; set when starting the app):
 | `The device is not paired or the device was disconnected!` but `ls /dev/hidraw*` shows it | Permissions: redo Step 5 and reconnect, or test once with `sudo mono build/jctool.exe` to confirm. |
 | Connects, but values stay empty, commands time out, or IR/NFC fail | The kernel's `hid_nintendo` driver is also talking to the controller. Run `sudo systemctl stop joycond` (if installed) and `sudo modprobe -r hid_nintendo`, then reconnect the controller. `sudo modprobe hid_nintendo` afterwards restores normal gamepad use. |
 | A third-party controller isn't found | Run `mono jcprobe.exe -l` and add a udev line for its IDs (see the rules file). It is offered automatically (with a confirmation) when no Nintendo controller is connected. |
+| Dialog buttons are dark with no readable text (dark desktop theme) | The app uses Mono's own light dialog colors since this was fixed; `git pull` and rebuild. `JCTOOL_DESKTOP_COLORS=1` keeps your desktop's colors instead. |
 | Text is cut off in places | Install `fonts-liberation2` (or your distro's Liberation fonts) and `fonts-dejavu`. |
 | Something behaves differently from Windows | Run with `-d`, reproduce it, and keep `build/traffic_log.txt`; it uses the same format as the Windows build's log, so the two can be compared. |
 
