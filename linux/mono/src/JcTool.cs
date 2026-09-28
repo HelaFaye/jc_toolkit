@@ -1444,7 +1444,7 @@ namespace CppWinFormJoy
             if (own < 1.0)
                 return false; // (Almost) uniform, e.g. black: nothing to tell by
             foreach (int other in new[] { 320, 160, 80, 40 }) {
-                if (other == width || pixels % other != 0 || pixels / other < 4)
+                if (other == width || pixels < 3 * other) // 30x40: 3.75 rows of 320
                     continue;
                 if (vertical_roughness(image, pixels, other) < own * 0.5)
                     return true;

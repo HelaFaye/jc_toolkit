@@ -334,6 +334,17 @@ namespace CppWinFormJoy
                     form.SelectIRResolution60p(false);
                     Check(fake.ir_mode_sets - stream_sets == 2 && form.lbl_IRStatus.Text == "Status: Standby",
                         name + ": IR stream sets the camera up again when it kept the old resolution");
+
+                    // 30x40 (4 fragments, 3.75 rows of 320): 320 pixel rows are still recognized,
+                    // a real 40 pixel wide image isn't flagged.
+                    byte* frame = stackalloc byte[1200];
+                    for (int i = 0; i < 1200; i++)
+                        frame[i] = (byte)((i % 320) < 160 ? 30 + i % 7 : 200 - i % 5);
+                    bool stuck_30p = Jc.ir_frame_has_other_width(frame, 0x03);
+                    for (int i = 0; i < 1200; i++)
+                        frame[i] = (byte)((i % 40) * 5 + (i / 40) * 3 + ((i % 40) % 10 == 0 ? 60 : 0));
+                    Check(stuck_30p && !Jc.ir_frame_has_other_width(frame, 0x03),
+                        name + ": IR 30x40 frames made of 320 pixel rows are detected");
                     File.Delete("IRcamera.png");
                 }
 

@@ -1511,7 +1511,7 @@ bool ir_frame_has_other_width(u8* image, int max_frag_no) {
     if (own < 1.0)
         return false; // (Almost) uniform, e.g. black: nothing to tell by
     for (int other : { 320, 160, 80, 40 }) {
-        if (other == width || pixels % other != 0 || pixels / other < 4)
+        if (other == width || pixels < 3 * other) // 30x40: 3.75 rows of 320
             continue;
         if (vertical_roughness(image, pixels, other) < own * 0.5)
             return true;
