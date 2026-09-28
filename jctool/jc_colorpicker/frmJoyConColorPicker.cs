@@ -2101,7 +2101,7 @@ namespace jcColor {
         private void frmColorPicker_Load(object sender, System.EventArgs e) {
             System.Xml.XmlDocument olddoc = new System.Xml.XmlDocument();
             try {
-                olddoc.Load(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\Colors.config");
+                olddoc.Load(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "Colors.config"));
             }
             catch {
                 getCustomColorFromConfig();
@@ -2723,7 +2723,7 @@ namespace jcColor {
         private void getCustomColorFromConfig() {
             System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
             try {
-                doc.Load(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\colors.xml");
+                doc.Load(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"));
             }
             catch {
                 // If colors.xml not found, create it
@@ -2732,13 +2732,13 @@ namespace jcColor {
                 settings.NewLineOnAttributes = true;
                 settings.IndentChars = "\t";
                 settings.ConformanceLevel = System.Xml.ConformanceLevel.Document;
-                using (System.Xml.XmlWriter writer = System.Xml.XmlWriter.Create("colors.xml", settings)) {
+                using (System.Xml.XmlWriter writer = System.Xml.XmlWriter.Create(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"), settings)) {
                     string newXml = "\n<configuration>\n\t<startup>\n\t\t<supportedRuntime version='v4.0' sku='.NETFramework,Version=v4.7.1' />" +
                     "\n\t</startup>\n\t<!--Values are in RGB-->\n</configuration>";
                     writer.WriteRaw(newXml);
                 }
                 try {
-                    doc.Load(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\colors.xml");
+                    doc.Load(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"));
                 }
                 catch {
                     errorCreatingPresets = true;
@@ -2808,7 +2808,7 @@ namespace jcColor {
                 "Old color presets found!", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
             System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
             try {
-                doc.Load(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\Colors.config");
+                doc.Load(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "Colors.config"));
             }
             catch {
                 return;
@@ -2888,8 +2888,8 @@ namespace jcColor {
                 j++;
             }
             try {
-                System.IO.File.Move(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\Colors.config",
-                    System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\Colors.backup");
+                System.IO.File.Move(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "Colors.config"),
+                    System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "Colors.backup"));
             }
             catch {
                 return;
@@ -2902,7 +2902,7 @@ namespace jcColor {
                 return;
             System.Xml.XmlDocument doc = new System.Xml.XmlDocument();
             try {
-                doc.Load(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\colors.xml");
+                doc.Load(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"));
             }
             catch {
                 MessageBox.Show("Error saving colors.xml!\nPlease check that you have write permissions.",
@@ -2935,7 +2935,7 @@ namespace jcColor {
                 }
             }
             try {
-                doc.Save(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\colors.xml");
+                doc.Save(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"));
             }
             catch {
                 MessageBox.Show("Error saving colors.xml!\nPlease check that the file is writable.\n\n" +
@@ -2967,7 +2967,7 @@ namespace jcColor {
                 }
             }
             try {
-                doc.Save(System.IO.Path.GetDirectoryName(Application.ExecutablePath) + "\\colors.xml");
+                doc.Save(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "colors.xml"));
             }
             catch {
                 MessageBox.Show("Error saving colors.xml!\nPlease check that the file is writable.\n\n" +
