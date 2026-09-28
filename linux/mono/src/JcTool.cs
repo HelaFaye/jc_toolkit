@@ -1625,7 +1625,11 @@ namespace CppWinFormJoy
             memset(frag_seen, 0, 256);
             bool quick_capture = ir_quick_capture && !enable_IRVideoPhoto; // Captures only; read once per run
             trace_note("IR: quick capture " + (quick_capture ? "on" : "off"));
-            int max_pixels = ((ir_max_frag_no < 218 ? ir_max_frag_no : 217) + 1) * 300;
+            // Linux fix: the Joy-Con counts white pixels on the full sensor, whatever the resolution
+            // (a 60x80 capture reported 8302, more than its 4800 pixels). The Windows code divided by
+            // the current resolution's pixel count, so below 240x320 auto exposure overreacted and
+            // dropped the exposure to 0 (black images). Use the full sensor, capped like the u16 count.
+            int max_pixels = 218 * 300;
             int white_pixels_percent = 0;
 
             memset(buf_image, 0, 19 * 4096); // C++ cleared sizeof(pointer) bytes; clear the whole frame instead

@@ -37,6 +37,7 @@ namespace CppWinFormJoy
         byte ir_max_frag;
         public int ir_frames_sent;
         public int closes;
+        public int ir_white_pixels;
         public int ir_register_writes;
         public int ir_register_write_thread;
         public int ir_fragment_delay_ms;
@@ -237,6 +238,8 @@ namespace CppWinFormJoy
                 r[51] = ir_mode;
                 r[52] = (byte)frag;
                 r[53] = 0x40;                        // average intensity
+                r[55] = (byte)(ir_white_pixels & 0xFF);  // white pixels, counted on the full sensor
+                r[56] = (byte)(ir_white_pixels >> 8);
                 if (ir_mode == 0x07)
                     for (int i = 0; i < 300; i++)
                         r[59 + i] = (byte)(((frag * 300 + i) * 255 / ((ir_max_frag + 1) * 300)) ^ ((i % 20) < 2 ? 0xFF : 0));

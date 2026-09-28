@@ -206,6 +206,19 @@ namespace CppWinFormJoy
                         name + ": IR quick capture saves a complete frame in 2 frames (" + quick_fragments + " fragments)");
                     File.Delete("IRcamera.png");
 
+                    // 60x80 with 8302 white pixels (a real capture): auto exposure must adjust
+                    // moderately, not drop to 0 (the Windows code's result: a black image).
+                    form.SelectIRResolution60p(true);
+                    form.IRExposure = 160;
+                    fake.ir_white_pixels = 8302;
+                    ir_res = form.CaptureIR();
+                    Check(ir_res == 0 && form.IRExposure >= 60,
+                        name + ": IR auto exposure at 60x80 doesn't black out the image (160us -> " + form.IRExposure + "us)");
+                    fake.ir_white_pixels = 0;
+                    form.SelectIRResolution60p(false);
+                    form.IRExposure = 300;
+                    File.Delete("IRcamera.png");
+
                     // The Joy-Con skips a fragment near the end of the saved frame and doesn't
                     // resend it before the last one. The capture must not save that frame.
                     fake.ir_skip_fragment = 253;

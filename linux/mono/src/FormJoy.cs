@@ -63,6 +63,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal Image PreviewImage { get { return this.pictureBoxPreview.Image; } }
     internal void RefreshPreview() { update_colors_from_spi(false); }
     internal int CaptureIR() { enable_IRVideoPhoto = false; return prepareSendIRConfig(true); }
+    internal void SelectIRResolution60p(bool on) { this.radioBtn_IR60p.Checked = on; this.radioBtn_IR240p.Checked = !on; }
+    internal decimal IRExposure { get { return this.numeric_IRExposure.Value; } set { this.numeric_IRExposure.Value = value; } }
     internal CheckBox IRQuickCaptureOption { get { return this.chkBox_IRQuickCapture; } }
     private CheckBox chkBox_IRQuickCapture;
     internal void ClickIRStream() { btn_getVideo_Click(null, EventArgs.Empty); }
