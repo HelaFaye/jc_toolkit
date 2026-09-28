@@ -1577,6 +1577,7 @@ namespace CppWinFormJoy
             System.Threading.Thread worker = ir_worker;
             if (worker == null || on_ir_worker())
                 return action();
+            device_release_window(); // The IR thread must be able to take the controller back
             ir_pending_action_done = false;
             lock (ir_ui_lock) { ir_pending_action = action; }
             while (!ir_pending_action_done) {
@@ -1605,11 +1606,14 @@ namespace CppWinFormJoy
             }
             var t = new System.Threading.Thread(() => {
                 trace_note("IR: thread started");
+                System.Threading.Monitor.Enter(device_lock); // See device_enter()
                 try { res = func(); }
                 catch (Exception ex) { error = ex; }
+                finally { System.Threading.Monitor.Exit(device_lock); }
                 trace_note("IR: thread finished, result " + res + (error != null ? ", error " + error.GetType().Name + ": " + error.Message : ""));
             });
             t.IsBackground = true;
+            device_release_window();
             ir_worker = t;
             t.Start();
             while (!t.Join(10))

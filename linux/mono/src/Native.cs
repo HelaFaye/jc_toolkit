@@ -235,6 +235,65 @@ namespace CppWinFormJoy
         static readonly object hid_lock = new object();
         const int ReadSliceMs = 10;
 
+        // Linux: while the IR camera runs on its thread, a command from the window (HD rumble,
+        // battery, ...) takes the controller for all of its calls, until the window is idle
+        // again; the IR thread waits meanwhile. This is how it worked on Windows, where the IR
+        // loop ran on the window thread and let such commands run in between frames. Without
+        // it, each thread read the other's replies (the battery read 0.00V after HD rumble).
+        public static readonly object device_lock = new object();
+        static int window_waiting;
+        static bool window_release_posted;
+
+        // Start of every controller call. Returns true if the caller must release device_lock
+        // right after this call (no window to release it later).
+        static bool device_enter()
+        {
+            if (ir_worker == null)
+                return false;
+            if (System.Threading.Thread.CurrentThread == ir_worker) {
+                ir_yield_device();
+                return false;
+            }
+            if (Monitor.IsEntered(device_lock))
+                return false;
+            Interlocked.Increment(ref window_waiting);
+            Monitor.Enter(device_lock);
+            Interlocked.Decrement(ref window_waiting);
+            var form = FormJoy.myform1;
+            if (form == null || !form.IsHandleCreated || form.InvokeRequired)
+                return true;
+            if (!window_release_posted) {
+                window_release_posted = true;
+                form.BeginInvoke((Action)device_release_window);
+            }
+            return false;
+        }
+
+        // IR thread: it holds device_lock for its run; let a waiting window command go first.
+        static void ir_yield_device()
+        {
+            if (Volatile.Read(ref window_waiting) > 0 && Monitor.IsEntered(device_lock)) {
+                Monitor.Exit(device_lock);
+                while (Volatile.Read(ref window_waiting) > 0)
+                    Thread.Sleep(1);
+                Monitor.Enter(device_lock);
+            }
+        }
+
+        // On the window thread when it's idle again (or before it waits for the IR thread).
+        public static void device_release_window()
+        {
+            window_release_posted = false;
+            while (Monitor.IsEntered(device_lock))
+                Monitor.Exit(device_lock);
+        }
+
+        static void device_exit(bool release)
+        {
+            if (release)
+                Monitor.Exit(device_lock);
+        }
+
         static int locked_read(IntPtr dev, byte* data, int length, int milliseconds)
         {
             if (milliseconds >= 0 && milliseconds <= ReadSliceMs) {
@@ -251,6 +310,8 @@ namespace CppWinFormJoy
                     res = native_hid_read_timeout(dev, data, (UIntPtr)length, slice);
                 if (res != 0 || (milliseconds >= 0 && clock.ElapsedMilliseconds >= milliseconds))
                     return res;
+                if (ir_worker != null && Thread.CurrentThread == ir_worker)
+                    ir_yield_device(); // Don't make a window command wait out a long read
             }
         }
 
@@ -292,6 +353,93 @@ namespace CppWinFormJoy
         }
 
         public static int hid_write(IntPtr dev, u8* data, int length)
+        {
+            bool release = device_enter();
+            try {
+                int res = hid_write_call(dev, data, length);
+                if (dev != IntPtr.Zero)
+                    link_count_write(res);
+                return res;
+            }
+            finally {
+                device_exit(release);
+            }
+        }
+
+        public static int hid_read_timeout(IntPtr dev, u8* data, int length, int milliseconds)
+        {
+            bool release = device_enter();
+            try {
+                long start = link_clock.ElapsedMilliseconds;
+                zero_read_got = 0;
+                int res = hid_read_call(dev, data, length, milliseconds);
+                if (dev != IntPtr.Zero)
+                    link_count_read(length == 0 && res == 0 ? zero_read_got : res, start);
+                return res;
+            }
+            finally {
+                device_exit(release);
+            }
+        }
+
+        // Linux: link health for the status bar. Counted over each interval between
+        // link_take_stats() calls: reports received, reads that timed out, failed calls, and the
+        // longest wait for a report while the app kept reading (idle time doesn't count).
+        public struct LinkStats
+        {
+            public int reports, timeouts, errors, writes, write_errors;
+            public long longest_gap_ms, interval_ms;
+        }
+        [ThreadStatic] static int zero_read_got; // A 0-length read (drop a report) got one
+        static readonly object link_stats_lock = new object();
+        static readonly System.Diagnostics.Stopwatch link_clock = System.Diagnostics.Stopwatch.StartNew();
+        static LinkStats link_stats;
+        static long link_interval_start, link_last_report_ms, link_last_read_end_ms = -1000;
+
+        static void link_count_read(int res, long start)
+        {
+            long now = link_clock.ElapsedMilliseconds;
+            lock (link_stats_lock) {
+                if (start - link_last_read_end_ms > 50)
+                    link_last_report_ms = start; // The app wasn't reading before this call
+                if (res > 0) {
+                    link_stats.reports++;
+                    link_stats.longest_gap_ms = Math.Max(link_stats.longest_gap_ms, now - link_last_report_ms);
+                    link_last_report_ms = now;
+                }
+                else if (res == 0)
+                    link_stats.timeouts++;
+                else
+                    link_stats.errors++;
+                link_last_read_end_ms = now;
+            }
+        }
+
+        static void link_count_write(int res)
+        {
+            lock (link_stats_lock) {
+                link_stats.writes++;
+                if (res < 0)
+                    link_stats.write_errors++;
+            }
+        }
+
+        public static LinkStats link_take_stats()
+        {
+            lock (link_stats_lock) {
+                long now = link_clock.ElapsedMilliseconds;
+                LinkStats s = link_stats;
+                s.interval_ms = now - link_interval_start;
+                // A report still awaited counts toward the longest gap
+                if (now - link_last_read_end_ms <= 50)
+                    s.longest_gap_ms = Math.Max(s.longest_gap_ms, now - link_last_report_ms);
+                link_stats = new LinkStats();
+                link_interval_start = now;
+                return s;
+            }
+        }
+
+        static int hid_write_call(IntPtr dev, u8* data, int length)
         {
             if (dev == IntPtr.Zero)
                 return -1;
@@ -341,7 +489,7 @@ namespace CppWinFormJoy
             return value != null && int.TryParse(value, out ms) && ms >= 0 ? ms : fallback;
         }
 
-        public static int hid_read_timeout(IntPtr dev, u8* data, int length, int milliseconds)
+        static int hid_read_call(IntPtr dev, u8* data, int length, int milliseconds)
         {
             if (dev == IntPtr.Zero)
                 return -1;
@@ -355,6 +503,7 @@ namespace CppWinFormJoy
                     return -1;
                 if (got > 0 && enable_traffic_dump)
                     traffic_log("R: ", scratch, 0, true);
+                zero_read_got = got;
                 return 0;
             }
 

@@ -317,6 +317,12 @@ namespace CppWinFormJoy
             if (replies.Count > 0) {
                 r = replies.Dequeue();
             }
+            else if (input_mode == 0x31 && mcu_state == 5 && ir_frames_sent > 0 && milliseconds > 0) {
+                // A real Joy-Con keeps sending reports (empty IR data) every ~15ms, so a reader that
+                // missed a fragment can ACK again.
+                Thread.Sleep(Math.Min(milliseconds, 15));
+                r = McuReport(0xFF);
+            }
             else if (input_mode == 0x30) {
                 Thread.Sleep(15);
                 r = NewReport(0x30, 49);

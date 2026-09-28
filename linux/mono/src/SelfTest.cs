@@ -342,17 +342,28 @@ namespace CppWinFormJoy
                     form.vib_loaded_file = stream_vib;
                     fake.concurrent_calls = 0;
                     int rumble_writes = 0, rumble_steps = 0;
+                    string battery_idle = form.RefreshBattery(), battery_streaming = null, link_streaming = null;
                     var rumble = new Timer { Interval = 400 };
                     rumble.Tick += (o, e) => {
                         rumble.Stop();
+                        try {
                         if (++rumble_steps == 1) {
                             int w = fake.writes;
                             Jc.play_hd_rumble_file(1, 1, 40, 0, 0, 0, 0);
                             rumble_writes = fake.writes - w;
+                            battery_streaming = form.RefreshBattery(); // Like the player's handler does
+                            form.update_link_health();
                             rumble.Start();
                         }
-                        else
+                        else {
                             form.ClickIRStream();
+                        }
+                        }
+                        catch (Exception ex) {
+                            Console.WriteLine("rumble step failed: " + ex);
+                            rumble_steps = 99;
+                            form.ClickIRStream();
+                        }
                     };
                     fake.ir_fragment_delay_ms = 1;
                     rumble.Start();
@@ -361,6 +372,13 @@ namespace CppWinFormJoy
                     fake.ir_fragment_delay_ms = 0;
                     Check(rumble_steps == 2 && rumble_writes >= 40 && fake.concurrent_calls == 0 && form.lbl_IRStatus.Text == "Status: Standby",
                         name + ": HD rumble during an IR stream: one controller call at a time (" + fake.concurrent_calls + " overlapped)");
+                    Check(battery_streaming == battery_idle && !battery_idle.Contains("0.00V"),
+                        name + ": battery read during an IR stream gets its reply (" + battery_streaming + ", idle" + battery_idle + ")");
+                    form.update_link_health();
+                    link_streaming = form.LinkText;
+                    form.update_link_health();
+                    Check(System.Text.RegularExpressions.Regex.IsMatch(link_streaming, @"^\d+/s \d+ms$") && form.LinkText == "Link idle",
+                        name + ": link health shown while streaming (" + link_streaming + "), idle afterwards");
 
                     // 30x40 (4 fragments, 3.75 rows of 320): 320 pixel rows are still recognized,
                     // a real 40 pixel wide image isn't flagged.

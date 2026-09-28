@@ -251,6 +251,15 @@ The protocol code (`cli/jc_core.cpp`) is ported from the Linux build's `JcTool.c
 the same Linux fixes. `cli/test/run_tests.sh` tests every menu against an emulated
 controller (no hardware needed).
 
+## Link health (status bar, Linux only)
+
+Left of the temperature, updated every second from the app's own traffic (it doesn't
+poll the controller): input reports received per second and the longest wait for one
+while the app was reading, e.g. `66/s 17ms`. About 60-70/s and 15-30ms is normal over
+Bluetooth. Orange: a wait over 100ms. Red (`Link: 3 err`): reads or writes failed, e.g.
+the controller disconnected. `Link idle` means the app isn't talking to the controller.
+Hover for details and totals since start.
+
 ## IR camera options (Linux only)
 
 A full-resolution (240x320) frame is 256 fragments, and the Joy-Con sends about
@@ -262,6 +271,9 @@ quarter of the data).
 **Quick capture** (IR Camera Settings, under Auto Exposure; off by default):
 Capture skips the auto exposure adjustment, uses the Exposure value as set, and
 saves the second frame (about 19 seconds at 240x320).
+
+While the camera runs, other commands (HD rumble, battery, ...) still work: the camera
+pauses while one runs, like on Windows.
 
 If the camera doesn't apply the settings (rarely, it keeps the previous
 resolution, which shows as vertical bars), a capture sets it up again and

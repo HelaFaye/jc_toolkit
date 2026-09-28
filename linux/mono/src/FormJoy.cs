@@ -60,6 +60,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal string FwText   { get { return this.textBoxFW.Text; } }
     internal string SnText   { get { return this.textBoxSN.Text; } }
     internal string BodyText { get { return this.lbl_Body_hex_txt.Text; } }
+    internal string RefreshBattery() { update_battery(); return this.toolStripLabel_batt.Text; }
     internal Image PreviewImage { get { return this.pictureBoxPreview.Image; } }
     internal void RefreshPreview() { update_colors_from_spi(false); }
     internal int CaptureIR() { enable_IRVideoPhoto = false; return prepareSendIRConfig(true); }
@@ -72,6 +73,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
 
     protected override void Dispose(bool disposing)
     {
+        if (disposing && timer_link != null)
+            timer_link.Dispose();
         if (disposing && components != null)
             components.Dispose();
         base.Dispose(disposing);
@@ -168,6 +171,24 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.toolTip1.SetToolTip(this.chkBox_IRQuickCapture,
             "Capture: skip the auto exposure adjustment, use the Exposure value as set\n" +
             "and save the second frame. About a third faster. Off: like the original (Windows) version.");
+
+        // Linux: link health in the status bar, left of the temperature. Updated every second
+        // from what the app sent and received (it doesn't poll the controller for it).
+        this.toolStripLabel_link = new ToolStripLabel();
+        this.toolStripLabel_link.Alignment = ToolStripItemAlignment.Right;
+        this.toolStripLabel_link.Font      = this.toolStripLabel_temp.Font;
+        this.toolStripLabel_link.ForeColor = System.Drawing.Color.FromArgb(251, 251, 251);
+        this.toolStripLabel_link.Margin    = new System.Windows.Forms.Padding(0);
+        this.toolStripLabel_link.Padding   = new System.Windows.Forms.Padding(2, 0, 6, 0);
+        this.toolStripLabel_link.Overflow  = ToolStripItemOverflow.Never;
+        this.toolStripLabel_link.Name      = "toolStripLabel_link";
+        this.toolStripLabel_link.Text      = "Link idle";
+        this.toolStripLabel_link.ToolTipText = "Link health, over the last second (Linux)";
+        this.toolStrip1.Items.Add(this.toolStripLabel_link);
+        link_take_stats();
+        this.timer_link = new Timer { Interval = 1000 };
+        this.timer_link.Tick += (sender, e) => update_link_health();
+        this.timer_link.Start();
 
         this.toolTip1.SetToolTip(this.label_sn, "Click here to change your S/N");
         this.toolTip1.SetToolTip(this.textBox_vib_loop_times,
@@ -573,6 +594,47 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             this.lbl_Buttons_hex_txt.Text = "Error!";
         }
     }
+
+    private ToolStripLabel toolStripLabel_link;
+    private Timer timer_link;
+    private int link_errors_total, link_timeouts_total;
+    private long link_longest_gap_total;
+
+    static readonly System.Drawing.Color link_ok    = System.Drawing.Color.FromArgb(251, 251, 251);
+    static readonly System.Drawing.Color link_slow  = System.Drawing.Color.FromArgb(255, 188, 0);
+    static readonly System.Drawing.Color link_error = System.Drawing.Color.FromArgb(255, 60, 40);
+
+    // Link: reports per second and the longest wait for one while the app was reading
+    // ("66/s 17ms"; details in the tooltip).
+    // Orange: a wait over 100ms. Red: failed reads/writes (e.g. the controller disconnected).
+    internal void update_link_health() {
+        LinkStats st = link_take_stats();
+        int errors = st.errors + st.write_errors;
+        link_errors_total   += errors;
+        link_timeouts_total += st.timeouts;
+        link_longest_gap_total = Math.Max(link_longest_gap_total, st.longest_gap_ms);
+        string text;
+        if (handle == IntPtr.Zero && fake == null)
+            text = "No link";
+        else if (st.reports == 0 && st.writes == 0 && errors == 0)
+            text = "Link idle";
+        else {
+            int rate = st.interval_ms > 0 ? (int)Math.Round(st.reports * 1000.0 / st.interval_ms) : st.reports;
+            text = errors > 0 ? "Link: " + errors + " err" : rate + "/s " + st.longest_gap_ms + "ms";
+        }
+        this.toolStripLabel_link.Text = text;
+        this.toolStripLabel_link.ForeColor = errors > 0 ? link_error : st.longest_gap_ms > 100 ? link_slow : link_ok;
+        this.toolStripLabel_link.ToolTipText =
+            "Link health over the last second (Linux):\n" +
+            "  reports received: " + st.reports + ", sent: " + st.writes + "\n" +
+            "  reads that timed out: " + st.timeouts + " (normal while idle in simple HID mode)\n" +
+            "  longest wait for a report: " + st.longest_gap_ms + "ms (~15ms is normal)\n" +
+            "  failed reads/writes: " + errors + "\n" +
+            "Since start: " + link_errors_total + " failed, " + link_timeouts_total + " timeouts, longest wait " + link_longest_gap_total + "ms";
+    }
+
+    internal string LinkText { get { return this.toolStripLabel_link.Text; } }
+    internal System.Drawing.Color LinkColor { get { return this.toolStripLabel_link.ForeColor; } }
 
     private void update_battery() {
         u8* batt_info = stackalloc u8[3];
