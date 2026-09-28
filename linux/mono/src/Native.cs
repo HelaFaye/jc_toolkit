@@ -296,6 +296,8 @@ namespace CppWinFormJoy
                                    : native_hid_read_timeout(dev, data, (UIntPtr)length, milliseconds);
             if (res > 0 && enable_traffic_dump)
                 traffic_log("R: ", data, res, false);
+            else if (res == 0 && enable_traffic_dump && traffic_timestamps)
+                traffic_log("R: timeout after " + milliseconds + "ms ", data, 0, false);
             return res;
         }
 
@@ -304,10 +306,19 @@ namespace CppWinFormJoy
             return hid_read_timeout(dev, data, length, -1);
         }
 
+        // JCTOOL_TIMESTAMPS=1 adds a millisecond timestamp to each -d log line and also logs
+        // read timeouts, to find where time goes (e.g. slow IR transfers). Off by default so
+        // the log matches the Windows build's format.
+        static readonly bool traffic_timestamps = Environment.GetEnvironmentVariable("JCTOOL_TIMESTAMPS") == "1";
+        static readonly System.Diagnostics.Stopwatch traffic_clock = System.Diagnostics.Stopwatch.StartNew();
+
         static void traffic_log(string prefix, u8* data, int length, bool zero_length_read)
         {
             try {
-                var sb = new StringBuilder(prefix);
+                var sb = new StringBuilder();
+                if (traffic_timestamps)
+                    sb.AppendFormat("[{0,10:F1}] ", traffic_clock.Elapsed.TotalMilliseconds);
+                sb.Append(prefix);
                 for (int i = 0; i < length; i++)
                     sb.AppendFormat("{0:x2} ", data[i]);
                 if (zero_length_read)
