@@ -204,14 +204,6 @@ namespace CppWinFormJoy
                         name + ": IR quick capture saves a complete frame in 2 frames (" + quick_fragments + " fragments)");
                     File.Delete("IRcamera.png");
 
-                    // JCTOOL_IR_NO_REACK=1 still captures (the emulator sends no empty reports).
-                    Jc.ir_no_reack = true;
-                    ir_res = form.CaptureIR();
-                    Jc.ir_no_reack = false;
-                    Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && File.Exists("IRcamera.png"),
-                        name + ": IR capture without re-ACKs still works");
-                    File.Delete("IRcamera.png");
-
                     // The Joy-Con skips a fragment near the end of the saved frame and doesn't
                     // resend it before the last one. The capture must not save that frame.
                     fake.ir_skip_fragment = 253;

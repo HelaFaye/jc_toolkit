@@ -227,7 +227,6 @@ Set these when starting the app, e.g. `JCTOOL_IR_QUICK=1 mono build/jctool.exe`:
 | Variable | Effect |
 |---|---|
 | `JCTOOL_IR_QUICK=1` | Capture adjusts the exposure during the first frame and saves the second (2 frames instead of 3). |
-| `JCTOOL_IR_NO_REACK=1` | Experiment: don't answer the Joy-Con's "no new data" reports. May be faster or slower; compare with `JCTOOL_TIMESTAMPS=1` and `-d`. |
 | `JCTOOL_TIMESTAMPS=1` | With `-d`, add millisecond timestamps to `traffic_log.txt`. |
 
 ## Troubleshooting
