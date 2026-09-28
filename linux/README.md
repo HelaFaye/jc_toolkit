@@ -247,6 +247,13 @@ resolution), the capture sets it up again and retries once, or says so.
 
 `JCTOOL_TIMESTAMPS=1` with `-d` adds millisecond timestamps to `traffic_log.txt`.
 
+Experiments (off by default; set when starting the app):
+
+| Variable | Effect |
+|---|---|
+| `JCTOOL_IR_SKIP_LEFTOVER=1` | The first frame of a capture is a leftover from before and is thrown away. Try to make the Joy-Con skip it (saves a frame, ~10s at 240x320). The `-d` log says whether it worked. |
+| `JCTOOL_IR_PATIENT_SETUP=1` | Wait ~300ms instead of ~135ms for the Joy-Con's answer to each camera setup command before sending it again. |
+
 ## Troubleshooting
 
 | Symptom | Fix |

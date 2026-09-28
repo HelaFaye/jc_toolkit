@@ -1656,7 +1656,11 @@ namespace CppWinFormJoy
             ir_last_capture_stale = false;
             memset(frag_seen, 0, 256);
             bool quick_capture = ir_quick_capture && !enable_IRVideoPhoto; // Captures only; read once per run
-            trace_note("IR: quick capture " + (quick_capture ? "on" : "off"));
+            trace_note("IR: quick capture " + (quick_capture ? "on" : "off")
+                + ", skip leftover " + (ir_skip_leftover ? "on" : "off") + ", patient setup " + (ir_patient_setup ? "on" : "off"));
+            bool skip_tried = false, skip_pending = false;
+            u8* leftover_frag0 = stackalloc u8[300];
+            long leftover_stats = 0;
             // Linux fix: the Joy-Con counts white pixels on the full sensor, whatever the resolution
             // (a 60x80 capture reported 8302, more than its 4800 pixels). The Windows code divided by
             // the current resolution's pixel count, so below 240x320 auto exposure overreacted and
@@ -1691,6 +1695,27 @@ namespace CppWinFormJoy
                 if (buf_reply[0] == 0x31 && buf_reply[49] == 0x03 && buf_reply[51] == mode) {
                     got_frag_no = buf_reply[52];
                     bool frame_done = false;
+
+                    // JCTOOL_IR_SKIP_LEFTOVER: see whether the Joy-Con started a new frame after we
+                    // ACKed the whole leftover frame. A new frame 0 differs from the leftover's.
+                    if (skip_pending && mode == 0x07) {
+                        skip_pending = false;
+                        bool same = got_frag_no == 0;
+                        for (int i = 0; same && i < 300; i++)
+                            if (buf_reply[59 + i] != leftover_frag0[i])
+                                same = false;
+                        if (got_frag_no == 0 && !same) {
+                            trace_note("IR: skip leftover worked, a new frame started");
+                            initialization = 1;
+                            frames_done = 1;
+                            first_frame_stats = leftover_stats;
+                            memset(frag_seen, 0, 256);
+                            previous_frag_no = ir_max_frag_no; // So this fragment 0 is next in sequence
+                        }
+                        else {
+                            trace_note("IR: skip leftover ignored (got fragment " + got_frag_no + (same ? ", the same data" : "") + ")");
+                        }
+                    }
                     if (got_frag_no == (previous_frag_no + 1) % (ir_max_frag_no + 1) || mode != 0x07) {
                         previous_frag_no = got_frag_no;
 
@@ -1876,8 +1901,17 @@ namespace CppWinFormJoy
                         hdr->timer = (u8)(timming_byte & 0xF);
                         timming_byte++;
                         buf[14] = (u8)(got_frag_no);
+                        // JCTOOL_IR_SKIP_LEFTOVER: on the leftover frame's first fragment, ACK its last one.
+                        if (ir_skip_leftover && !skip_tried && mode == 0x07 && initialization == 2 && got_frag_no == 0) {
+                            skip_tried = true;
+                            skip_pending = true;
+                            memcpy(leftover_frag0, buf_reply + 59, 300);
+                            leftover_stats = ((long)buf_reply[53] << 32) | ((long)buf_reply[54] << 16) | *(u16*)&buf_reply[55];
+                            buf[14] = (u8)ir_max_frag_no;
+                        }
                         buf[47] = mcu_crc8_calc(buf + 11, 36);
                         hid_write(handle, buf, 49);
+                        buf[14] = (u8)(got_frag_no);
 
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
                         frag_seen[got_frag_no] = 1;
@@ -1983,6 +2017,16 @@ namespace CppWinFormJoy
         }
 
 
+        // Linux experiments (environment variables, off by default):
+        // JCTOOL_IR_PATIENT_SETUP=1  Wait ~20 reports (~300ms) for a setup reply before re-sending
+        //                            instead of 9 (~135ms). A Joy-Con (R) answered after 120-150ms,
+        //                            so the early re-sends caused duplicate replies and more re-sends.
+        // JCTOOL_IR_SKIP_LEFTOVER=1  ACK the whole leftover first frame when its first fragment
+        //                            arrives, hoping the Joy-Con moves on to a new frame.
+        public static bool ir_patient_setup = Environment.GetEnvironmentVariable("JCTOOL_IR_PATIENT_SETUP") == "1";
+        public static bool ir_skip_leftover = Environment.GetEnvironmentVariable("JCTOOL_IR_SKIP_LEFTOVER") == "1";
+        static int ir_setup_reads { get { return ir_patient_setup ? 19 : 8; } }
+
         public static int ir_sensor(ref ir_image_config ir_cfg) {
             int res;
             u8* buf = stackalloc u8[0x170];
@@ -2007,7 +2051,7 @@ namespace CppWinFormJoy
                         goto step1;
 
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2037,7 +2081,7 @@ namespace CppWinFormJoy
                         goto step2;
 
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2071,7 +2115,7 @@ namespace CppWinFormJoy
                             goto step3;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2110,7 +2154,7 @@ namespace CppWinFormJoy
                             goto step4;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2142,7 +2186,7 @@ namespace CppWinFormJoy
                             goto step5;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2184,7 +2228,7 @@ namespace CppWinFormJoy
                             goto step6;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2289,7 +2333,7 @@ namespace CppWinFormJoy
                             goto step8;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2353,7 +2397,7 @@ namespace CppWinFormJoy
                             goto step9;
                     }
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;
@@ -2405,7 +2449,7 @@ namespace CppWinFormJoy
                         goto stepf;
 
                     retries++;
-                    if (retries > 8 || res == 0)
+                    if (retries > ir_setup_reads || res == 0)
                         break;
                 }
                 error_reading++;

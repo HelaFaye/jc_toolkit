@@ -39,6 +39,7 @@ namespace CppWinFormJoy
         public int closes;
         public int ir_white_pixels;
         public int ir_stale_captures;
+        int ir_frame_index;
         public int ir_stuck_captures;  // runs that keep sending 240x320 rows with real stats
         bool ir_stuck_run;
         public int ir_mode_sets;
@@ -201,6 +202,7 @@ namespace CppWinFormJoy
                 ir_mode = data[13];
                 ir_max_frag = data[14];
                 ir_frames_sent = 0;
+                ir_frame_index = 0;
                 ir_mode_sets++;
                 ir_stale_run = ir_stale_captures > 0;
                 if (ir_stale_captures > 0)
@@ -244,6 +246,8 @@ namespace CppWinFormJoy
                     ir_skip_after_register_write = false;
                     ir_skipped_for_register_write = true;
                 }
+                if (frag == 0 && ir_frames_sent > 0)
+                    ir_frame_index++;           // A new frame starts
                 ir_last_frag = frag;
                 var r = McuReport(0x03);
                 r[50] = 0x00;
@@ -251,7 +255,8 @@ namespace CppWinFormJoy
                 r[52] = (byte)frag;
                 // Stats: the first frame of a run carries placeholder values, like a real Joy-Con.
                 // ir_stale_captures > 0: the camera "keeps its old settings" for that many runs.
-                bool placeholder = ir_frames_sent <= ir_max_frag || ir_stale_run;
+                // The first frame of a run is a leftover frame from before (other pixels too).
+                bool placeholder = ir_frame_index == 0 || ir_stale_run;
                 r[53] = (byte)(placeholder ? 31 : 0x40);   // average intensity
                 int white = placeholder ? 5600 : ir_white_pixels; // white pixels, counted on the full sensor
                 r[55] = (byte)(white & 0xFF);
@@ -266,7 +271,7 @@ namespace CppWinFormJoy
                     int height = (ir_max_frag + 1) * 300 / width;
                     for (int i = 0; i < 300; i++) {
                         int x = (frag * 300 + i) % width, y = (frag * 300 + i) / width;
-                        r[59 + i] = (x % 20) < 2 ? (byte)0xFF : (byte)(y * 200 / height + x * 50 / width);
+                        r[59 + i] = (x % 20) < 2 ? (byte)0xFF : (byte)(y * 200 / height + x * 50 / width + (ir_frame_index == 0 ? 5 : 0));
                     }
                 }
                 if (ir_fragment_delay_ms > 0)

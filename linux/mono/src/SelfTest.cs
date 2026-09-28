@@ -221,6 +221,19 @@ namespace CppWinFormJoy
                     form.IRExposure = 300;
                     File.Delete("IRcamera.png");
 
+                    // JCTOOL_IR_SKIP_LEFTOVER: the leftover frame is skipped when the Joy-Con moves on.
+                    Jc.ir_skip_leftover = true;
+                    ir_res = form.CaptureIR();
+                    int skip_fragments = fake.ir_frames_sent;
+                    form.IRQuickCaptureOption.Checked = true;
+                    int ir_res2 = form.CaptureIR();
+                    int skip_quick_fragments = fake.ir_frames_sent;
+                    form.IRQuickCaptureOption.Checked = false;
+                    Jc.ir_skip_leftover = false;
+                    Check(ir_res == 0 && ir_res2 == 0 && Jc.ir_last_frame_missing == 0 && skip_fragments <= 2 * 256 + 16 && skip_quick_fragments <= 256 + 16,
+                        name + ": IR skip leftover saves a frame (" + skip_fragments + " fragments, quick " + skip_quick_fragments + ")");
+                    File.Delete("IRcamera.png");
+
                     // The camera keeps its old settings once: set it up again and capture once more.
                     fake.ir_stale_captures = 1;
                     int sets_before = fake.ir_mode_sets;
