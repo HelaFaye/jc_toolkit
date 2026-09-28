@@ -155,6 +155,11 @@ namespace CppWinFormJoy
             catch (Exception) {
             }
 
+            if (args.Length > 0 && args[0] == "--diag-colors") {
+                SystemColorsFix.Diagnose();
+                return 0;
+            }
+
             // Readable dialogs with a dark desktop theme (see SystemColorsFix.cs)
             SystemColorsFix.UseBuiltInColors();
 
