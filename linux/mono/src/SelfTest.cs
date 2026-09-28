@@ -178,6 +178,38 @@ namespace CppWinFormJoy
                 Check(res == 0 && same, name + ": SPI dump writes the full 512KB flash byte for byte");
                 File.Delete(file);
 
+                if (type == Jc.JOYCON_R) {
+                    File.Delete("IRcamera.png");
+                    int ir_res = form.CaptureIR();
+                    Check(ir_res == 0 && File.Exists("IRcamera.png") && fake.ir_frames_sent >= 256,
+                        name + ": IR camera capture reassembles a 240x320 frame and saves IRcamera.png");
+                    if (File.Exists("IRcamera.png")) {
+                        using (var img = System.Drawing.Image.FromFile("IRcamera.png"))
+                            Check(img.Width == 240 && img.Height == 320, name + ": IRcamera.png is 240x320 (rotated like on Windows)");
+                        File.Delete("IRcamera.png");
+                    }
+                }
+
+                // Debug: custom command (subcmd 0x02 device info) and its reply dump
+                byte* arg = stackalloc byte[44];
+                Jc.memset(arg, 0, 44);
+                arg[0] = 0x01;
+                arg[5] = 0x02;
+                Jc.send_custom_command(arg);
+                Check(form.textBoxDbg_reply.Text.StartsWith("Subcmd Reply:") && form.textBoxDbg_reply.Text.Contains("82 02 03 89"),
+                    name + ": debug custom command sends and shows the reply");
+
+                // HD Rumble player: a 20 sample raw (.jcvib) file at 1ms
+                byte[] vib = new byte[0x0A + 20 * 4];
+                vib[0] = 0x52; vib[1] = 0x52; vib[2] = 0x41; vib[3] = 0x57;
+                for (int i = 0x0A; i < vib.Length; i++)
+                    vib[i] = (byte)i;
+                form.vib_loaded_file = vib;
+                form.vib_file_converted = vib;
+                int writes = fake.writes;
+                Jc.play_hd_rumble_file(1, 1, 20, 0, 0, 0, 0);
+                Check(fake.writes - writes >= 20, name + ": HD rumble player sends every sample");
+
                 // Close() would run Form1_FormClosing, which exits the process like the original.
                 form.Hide();
                 form.Dispose();

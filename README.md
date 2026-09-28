@@ -39,7 +39,7 @@ Others:
 
 ## Linux
 
-A Linux port is in progress. See [docs/LINUX_PORTING.md](docs/LINUX_PORTING.md) for the porting guide (C# on Mono, or Python + Kivy) and [linux/](linux) for the udev rules and starter code.
+Joy-Con Toolkit runs natively on Linux with Mono. See [linux/README.md](linux/README.md) for install, build and step-by-step testing instructions, and [docs/LINUX_PORTING.md](docs/LINUX_PORTING.md) for how the port was done.
 
 ## References:
 

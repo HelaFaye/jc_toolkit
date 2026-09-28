@@ -62,6 +62,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal string BodyText { get { return this.lbl_Body_hex_txt.Text; } }
     internal Image PreviewImage { get { return this.pictureBoxPreview.Image; } }
     internal void RefreshPreview() { update_colors_from_spi(false); }
+    internal int CaptureIR() { enable_IRVideoPhoto = false; return prepareSendIRConfig(true); }
 
     protected override void Dispose(bool disposing)
     {

@@ -4,7 +4,8 @@
 // A software Joy-Con/Pro Controller for testing without hardware (--selftest, --demo).
 // It answers the subcommands jctool uses the way a real controller does
 // (see dekuNukem/Nintendo_Switch_Reverse_Engineering), backed by a 512KB SPI
-// flash image in memory. The IR/NFC MCU is not emulated.
+// flash image in memory. The IR camera is emulated in image transfer mode
+// (a test pattern); NFC is not emulated.
 
 using System;
 using System.Collections.Generic;
@@ -31,6 +32,10 @@ namespace CppWinFormJoy
         bool imu_on;
         byte timer;
         int tick;
+        byte mcu_state;     // 0: off, 1: standby, 5: IR
+        byte ir_mode;
+        byte ir_max_frag;
+        public int ir_frames_sent;
 
         public FakeJoyCon(int type)
         {
@@ -95,8 +100,10 @@ namespace CppWinFormJoy
             writes++;
             last_write_length = length;
             byte cmd = data[0];
+            if (cmd == 0x11)
+                return McuWrite(data, length);
             if (cmd != 0x01)
-                return length;   // 0x10 rumble only, 0x11 MCU: no reply
+                return length;   // 0x10 rumble only: no reply
 
             byte subcmd = data[10];
             switch (subcmd) {
@@ -138,12 +145,75 @@ namespace CppWinFormJoy
                     else
                         Ack(0x43, 0xC0, data[11], data[12], 0x60, 0x00);   // 31.0 C
                     break;
+                case 0x21: // MCU config
+                    McuConfig(data);
+                    break;
+                case 0x22: // MCU on/off
+                    mcu_state = (byte)(data[11] != 0 ? 1 : 0);
+                    Ack(0x22, 0x80);
+                    break;
                 case 0x50: // Regulated voltage
                     Ack(0x50, 0xD0, 0x10, 0x06);   // 0x610: 3.88V
                     break;
                 default:
                     Ack(subcmd, 0x80);
                     break;
+            }
+            return length;
+        }
+
+        byte[] McuReport(byte report_type)
+        {
+            var r = NewReport(0x31, 362);
+            r[49] = report_type;
+            return r;
+        }
+
+        void McuConfig(u8* data)
+        {
+            var r = NewReport(0x21, 49);
+            r[13] = 0xA0;
+            r[14] = 0x21;
+            if (data[11] == 0x21) {             // Set MCU mode
+                if (mcu_state != 0)
+                    mcu_state = data[13];
+                r[15] = 0x01;
+                r[22] = 0x01;
+            }
+            else if (data[11] == 0x23 && data[12] == 0x01) {   // Set IR mode
+                ir_mode = data[13];
+                ir_max_frag = data[14];
+                ir_frames_sent = 0;
+                r[15] = 0x0b;
+            }
+            else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
+                r[15] = 0x13;
+                r[16] = 0x00;
+                r[17] = (byte)(ir_mode == 0x04 ? 0x02 : ir_mode);
+            }
+            replies.Enqueue(r);
+        }
+
+        int McuWrite(u8* data, int length)
+        {
+            if (data[10] == 0x01) {                 // MCU status
+                var r = McuReport(0x01);
+                r[56] = mcu_state;
+                replies.Enqueue(r);
+            }
+            else if (data[10] == 0x03 && data[11] == 0x00 && mcu_state == 5 && ir_mode != 0) {
+                // IR fragment ACK: send the next fragment of a test pattern (diagonal gradient)
+                int frag = data[12] == 0x01 ? data[13] : (ir_frames_sent == 0 ? 0 : (data[14] + 1) % (ir_max_frag + 1));
+                var r = McuReport(0x03);
+                r[50] = 0x00;
+                r[51] = ir_mode;
+                r[52] = (byte)frag;
+                r[53] = 0x40;                        // average intensity
+                if (ir_mode == 0x07)
+                    for (int i = 0; i < 300; i++)
+                        r[59 + i] = (byte)(((frag * 300 + i) * 255 / ((ir_max_frag + 1) * 300)) ^ ((i % 20) < 2 ? 0xFF : 0));
+                replies.Enqueue(r);
+                ir_frames_sent++;
             }
             return length;
         }

@@ -1540,7 +1540,7 @@ namespace CppWinFormJoy
                             white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                             avg_intensity_percent = (int)((buf_reply[53] * 100) / 255);
                             FormJoy.myform1.lbl_IRHelp.Text = String.Format("Amb Noise: {0:f2},  Int: {1:D}%,  FPS: {2:D} ({3:D}ms)\nEXFilter: {4:D},  White Px: {5:D}%,  EXF Int: {6:D}",
-                                noise_level, avg_intensity_percent, (int)(1000 / elapsed_time2), elapsed_time2, *(u16*)&buf_reply[57], white_pixels_percent, buf_reply[54]);
+                                noise_level, avg_intensity_percent, elapsed_time2 > 0 ? (int)(1000 / elapsed_time2) : 0, elapsed_time2, *(u16*)&buf_reply[57], white_pixels_percent, buf_reply[54]);
 
                             elapsed_time2 = (int)sw.ElapsedMilliseconds;
 
@@ -2681,12 +2681,19 @@ namespace CppWinFormJoy
                         else if (buf2[49] == 0x3a && buf2[51] == 0x07) {
                             if (ntag_init_done) {
                                 payload_size = (u16)((buf2[54] << 8 | buf2[55]) & 0x7FF);
+                                // The lengths come from the controller. C++ trusted them; bound
+                                // them so a malformed reply can't write past the buffers.
                                 if (buf2[52] == 0x01) {
-                                    memcpy(ntag_buffer + ntag_buffer_pos, buf2 + 116, payload_size - 60);
-                                    ntag_buffer_pos += (u16)(payload_size - 60);
+                                    int len = Math.Min(Math.Min(payload_size - 60, 368 - 116), 924 - ntag_buffer_pos);
+                                    if (len > 0) {
+                                        memcpy(ntag_buffer + ntag_buffer_pos, buf2 + 116, len);
+                                        ntag_buffer_pos += (u16)len;
+                                    }
                                 }
                                 else {
-                                    memcpy(ntag_buffer + ntag_buffer_pos, buf2 + 56, payload_size);
+                                    int len = Math.Min(Math.Min((int)payload_size, 368 - 56), 924 - ntag_buffer_pos);
+                                    if (len > 0)
+                                        memcpy(ntag_buffer + ntag_buffer_pos, buf2 + 56, len);
                                 }
                             }
                             else if (buf2[52] == 0x01) {

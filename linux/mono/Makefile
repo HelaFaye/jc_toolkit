@@ -21,9 +21,10 @@ $(BUILD)/jctool.exe: $(APP_SOURCES) $(BUILD)/jcColor.dll $(BUILD)/CppWinFormJoy.
 		-resource:$(BUILD)/CppWinFormJoy.FormJoy.resources -resource:$(BUILD)/CppWinFormJoy.images.resources \
 		$(APP_SOURCES)
 
-# The existing C# color picker, built unchanged from jctool/jc_colorpicker
+# The existing C# color picker from jctool/jc_colorpicker. Its sources are Latin-1
+# (files with a UTF-8 BOM are still read as UTF-8).
 $(BUILD)/jcColor.dll: $(CP_SOURCES) $(CP_RESOURCES)
-	$(MCS) -optimize+ -target:library -out:$@ $(REFS) $(addprefix -resource:,$(CP_RESOURCES)) $(CP_SOURCES)
+	$(MCS) -optimize+ -codepage:28591 -target:library -out:$@ $(REFS) $(addprefix -resource:,$(CP_RESOURCES)) $(CP_SOURCES)
 
 $(BUILD)/CppWinFormJoy.%.resources: $(SRC)/%.resx
 	@mkdir -p $(BUILD)

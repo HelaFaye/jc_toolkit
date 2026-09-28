@@ -1,9 +1,14 @@
 # Porting Joy-Con Toolkit to Linux
 
+> **Status:** Route A below (C# on Mono) is done. The full app lives in
+> [`linux/mono/src`](../linux/mono/src). To build, test and use it, follow
+> [`linux/README.md`](../linux/README.md). This document is kept as the design
+> notes behind the port and as a guide for Route B (Python + Kivy).
+
 This guide takes Joy-Con Toolkit from a Windows-only C++/CLI app to a native
 Linux app with the same features. It covers two routes:
 
-- **Route A — C# on Mono (recommended).** Keep WinForms, reuse the existing
+- **Route A — C# on Mono (done).** Keep WinForms, reuse the existing
   C# color picker unchanged, and convert the rest of the code.
 - **Route B — Python + Kivy.** A full rewrite with a new UI.
 
@@ -16,7 +21,8 @@ Starter code lives in [`linux/`](../linux):
 | `linux/udev/50-nintendo-switch-controllers.rules` | Lets your user open the controllers without root | Ready to install |
 | `linux/mono/HidApi.cs` | P/Invoke binding to `libhidapi-hidraw` for every hidapi call jctool uses | Builds on Mono 6.8 |
 | `linux/mono/JoyCon.cs`, `JcProbe.cs` | C# port of the connection logic, device info, SPI read/write, S/N | Builds on Mono 6.8; not yet tested with a controller |
-| `linux/mono/tools/cppcli_designer_to_cs.py` | Converts FormJoy.h's WinForms designer code to C# | Output builds and renders on Mono (screenshot below) |
+| `linux/mono/tools/cppcli_designer_to_cs.py` | Converts FormJoy.h's WinForms designer code to C# | Generates `linux/mono/src/FormJoy.Designer.cs` |
+| `linux/mono/src/` | The complete port | Builds and passes `--selftest`; see `linux/README.md` |
 | `linux/python/jcprobe.py` | Python version of `jcprobe` for Route B | Runs; not yet tested with a controller |
 | `linux/python/extract_resx_images.py` | Pulls the controller/battery images out of the `.resx` files as PNGs | Tested: 23 PNGs + icon |
 
@@ -173,10 +179,10 @@ right, and everything after this is translation.
 ### Step A2 — Milestone 2: the form on Mono
 
 ```sh
-make preview         # converts FormJoy.h, compiles resources, opens the form
+make regen           # re-generates src/FormJoy.Designer.cs (and src/Tables.cs) from the C++ sources
 ```
 
-`tools/cppcli_designer_to_cs.py` writes to `linux/mono/build/`:
+`tools/cppcli_designer_to_cs.py` writes to `linux/mono/build/regen/`:
 
 - `FormJoy.Designer.cs` — the 211 control fields and `InitializeComponent()`.
   Don't edit it; change FormJoy.h and re-run the script, or stop generating it
