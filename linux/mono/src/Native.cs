@@ -226,10 +226,46 @@ namespace CppWinFormJoy
         [DllImport(HidLib, EntryPoint = "hid_read_timeout")] static extern int native_hid_read_timeout(IntPtr dev, byte* data, UIntPtr length, int milliseconds);
         [DllImport(HidLib, EntryPoint = "hid_close")] static extern void native_hid_close(IntPtr dev);
 
+        // Linux: hidapi isn't thread safe for one device (every call frees and replaces the device's
+        // error string). The IR camera runs on its own thread while the window can still send
+        // commands (e.g. the HD Rumble player during a stream), which crashed in glibc (SIGABRT in
+        // hid_read_timeout). On Windows both ran on the window thread, one call at a time. Keep it
+        // that way: one native call at a time, with long reads split into short slices so writes
+        // from the other thread still get through quickly.
+        static readonly object hid_lock = new object();
+        const int ReadSliceMs = 10;
+
+        static int locked_read(IntPtr dev, byte* data, int length, int milliseconds)
+        {
+            if (milliseconds >= 0 && milliseconds <= ReadSliceMs) {
+                lock (hid_lock)
+                    return native_hid_read_timeout(dev, data, (UIntPtr)length, milliseconds);
+            }
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (true) {
+                int slice = ReadSliceMs;
+                if (milliseconds >= 0)
+                    slice = (int)Math.Max(0, Math.Min(ReadSliceMs, milliseconds - clock.ElapsedMilliseconds));
+                int res;
+                lock (hid_lock)
+                    res = native_hid_read_timeout(dev, data, (UIntPtr)length, slice);
+                if (res != 0 || (milliseconds >= 0 && clock.ElapsedMilliseconds >= milliseconds))
+                    return res;
+            }
+        }
+
+        static int fake_read(byte* data, int length, int milliseconds)
+        {
+            lock (hid_lock)
+                return fake.Read(data, length, milliseconds);
+        }
+
         public static void hid_close(IntPtr dev)
         {
-            if (fake == null)
-                native_hid_close(dev);
+            if (fake == null) {
+                lock (hid_lock)
+                    native_hid_close(dev);
+            }
             else
                 fake.closes++;
         }
@@ -282,9 +318,12 @@ namespace CppWinFormJoy
                 traffic_log("W: ", data, length, false);
 
             if (fake != null)
-                return fake.Write(data, length);
+                lock (hid_lock)
+                    return fake.Write(data, length);
             long write_start = trace_start();
-            int res = native_hid_write(dev, data, (UIntPtr)length);
+            int res;
+            lock (hid_lock)
+                res = native_hid_write(dev, data, (UIntPtr)length);
             trace_slow("hid_write", write_start);
             if (data[0] == 0x11)
                 last_mcu_write_ms = write_clock.ElapsedMilliseconds;
@@ -310,8 +349,8 @@ namespace CppWinFormJoy
             if (length == 0) {
                 // On Windows a 0-length read waits for a report and drops it. Keep that.
                 byte* scratch = stackalloc byte[0x170];
-                int got = fake != null ? fake.Read(scratch, 0x170, milliseconds)
-                                       : native_hid_read_timeout(dev, scratch, (UIntPtr)0x170, milliseconds);
+                int got = fake != null ? fake_read(scratch, 0x170, milliseconds)
+                                       : locked_read(dev, scratch, 0x170, milliseconds);
                 if (got < 0)
                     return -1;
                 if (got > 0 && enable_traffic_dump)
@@ -319,8 +358,8 @@ namespace CppWinFormJoy
                 return 0;
             }
 
-            int res = fake != null ? fake.Read(data, length, milliseconds)
-                                   : native_hid_read_timeout(dev, data, (UIntPtr)length, milliseconds);
+            int res = fake != null ? fake_read(data, length, milliseconds)
+                                   : locked_read(dev, data, length, milliseconds);
             if (res > 0 && enable_traffic_dump)
                 traffic_log("R: ", data, res, false);
             else if (res == 0 && enable_traffic_dump && traffic_timestamps)

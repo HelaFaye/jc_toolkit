@@ -335,6 +335,33 @@ namespace CppWinFormJoy
                     Check(fake.ir_mode_sets - stream_sets == 2 && form.lbl_IRStatus.Text == "Status: Standby",
                         name + ": IR stream sets the camera up again when it kept the old resolution");
 
+                    // HD Rumble player during a stream (crashed hidapi: two threads using the
+                    // controller at once). Calls must not overlap, and both must finish.
+                    byte[] stream_vib = new byte[0x0A + 40 * 4];
+                    stream_vib[0] = 0x52; stream_vib[1] = 0x52; stream_vib[2] = 0x41; stream_vib[3] = 0x57;
+                    form.vib_loaded_file = stream_vib;
+                    fake.concurrent_calls = 0;
+                    int rumble_writes = 0, rumble_steps = 0;
+                    var rumble = new Timer { Interval = 400 };
+                    rumble.Tick += (o, e) => {
+                        rumble.Stop();
+                        if (++rumble_steps == 1) {
+                            int w = fake.writes;
+                            Jc.play_hd_rumble_file(1, 1, 40, 0, 0, 0, 0);
+                            rumble_writes = fake.writes - w;
+                            rumble.Start();
+                        }
+                        else
+                            form.ClickIRStream();
+                    };
+                    fake.ir_fragment_delay_ms = 1;
+                    rumble.Start();
+                    form.ClickIRStream();
+                    rumble.Stop();
+                    fake.ir_fragment_delay_ms = 0;
+                    Check(rumble_steps == 2 && rumble_writes >= 40 && fake.concurrent_calls == 0 && form.lbl_IRStatus.Text == "Status: Standby",
+                        name + ": HD rumble during an IR stream: one controller call at a time (" + fake.concurrent_calls + " overlapped)");
+
                     // 30x40 (4 fragments, 3.75 rows of 320): 320 pixel rows are still recognized,
                     // a real 40 pixel wide image isn't flagged.
                     byte* frame = stackalloc byte[1200];

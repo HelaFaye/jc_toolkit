@@ -113,7 +113,24 @@ namespace CppWinFormJoy
             replies.Enqueue(r);
         }
 
+        // Calls that overlapped another call (hidapi isn't thread safe for one device).
+        public int concurrent_calls;
+        int calls_inside;
+
         public int Write(u8* data, int length)
+        {
+            if (Interlocked.Increment(ref calls_inside) > 1)
+                Interlocked.Increment(ref concurrent_calls);
+            try {
+                Thread.Sleep(0);
+                return WriteReport(data, length);
+            }
+            finally {
+                Interlocked.Decrement(ref calls_inside);
+            }
+        }
+
+        int WriteReport(u8* data, int length)
         {
             writes++;
             last_write_length = length;
@@ -283,6 +300,18 @@ namespace CppWinFormJoy
         }
 
         public int Read(u8* data, int length, int milliseconds)
+        {
+            if (Interlocked.Increment(ref calls_inside) > 1)
+                Interlocked.Increment(ref concurrent_calls);
+            try {
+                return ReadReport(data, length, milliseconds);
+            }
+            finally {
+                Interlocked.Decrement(ref calls_inside);
+            }
+        }
+
+        int ReadReport(u8* data, int length, int milliseconds)
         {
             byte[] r = null;
             if (replies.Count > 0) {
