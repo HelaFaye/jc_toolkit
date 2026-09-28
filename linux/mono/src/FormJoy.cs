@@ -2388,12 +2388,19 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             rotatedImage.Save("IRcamera.png", System.Drawing.Imaging.ImageFormat.Png);
 
         Image resizedImage = new Bitmap(240, 320);
-        Graphics graphicsHandle = Graphics.FromImage(resizedImage);
-        graphicsHandle.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-        graphicsHandle.DrawImage(rotatedImage, 0, 0, 240, 320);
+        using (Graphics graphicsHandle = Graphics.FromImage(resizedImage)) {
+            graphicsHandle.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphicsHandle.DrawImage(rotatedImage, 0, 0, 240, 320);
+        }
+        // Linux: free each frame's images now. libgdiplus keeps them in native memory until the
+        // GC finalizes them, which piles up while streaming.
+        rotatedImage.Dispose();
 
         this.pictureBoxIR.ClientSize = new System.Drawing.Size(240, 320);
+        Image oldImage = this.pictureBoxIR.Image;
         this.pictureBoxIR.Image = resizedImage;
+        if (oldImage != null)
+            oldImage.Dispose();
         //this.AutoScaleDimensions = new System.Drawing.SizeF(96, 96);
     }
 

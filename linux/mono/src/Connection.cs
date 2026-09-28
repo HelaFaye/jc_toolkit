@@ -94,6 +94,12 @@ namespace CppWinFormJoy
                     enable_hid_listings = false;
                 }
 
+                // The IR camera thread is using the handle (e.g. Stop was clicked while
+                // streaming). Closing it under that thread's read would crash, and the
+                // connection is evidently alive, so keep it.
+                if (ir_worker != null && handle != IntPtr.Zero)
+                    return handle_type;
+
                 // The Windows code reopened the device on every check without closing the
                 // previous handle. Close it first so file descriptors don't pile up.
                 if (handle != IntPtr.Zero) {

@@ -205,11 +205,12 @@ namespace CppWinFormJoy
                     File.Delete("IRcamera.png");
 
                     // Stream, apply a live config change while streaming, then Stop.
-                    int writes_before = 0, writes_after = 0, write_thread = 0, step = 0;
+                    int writes_before = 0, writes_after = 0, write_thread = 0, step = 0, closes_streaming = 0;
                     var clicks = new Timer { Interval = 300 };
                     clicks.Tick += (o, e) => {
                         clicks.Stop();
                         if (++step == 1) {
+                            closes_streaming = fake.closes;
                             writes_before = fake.ir_register_writes;
                             form.ClickIRConfigLive();
                             writes_after = fake.ir_register_writes;
@@ -217,7 +218,8 @@ namespace CppWinFormJoy
                             clicks.Start();
                         }
                         else {
-                            form.ClickIRStream(); // Stop
+                            form.ClickIRStream(); // Stop (checks the connection first, like every button)
+                            closes_streaming = fake.closes - closes_streaming;
                         }
                     };
                     fake.ir_fragment_delay_ms = 1;
@@ -230,6 +232,8 @@ namespace CppWinFormJoy
                     Check(step == 2 && writes_after > writes_before && write_thread != System.Threading.Thread.CurrentThread.ManagedThreadId
                         && watch.ElapsedMilliseconds < 5000 && form.lbl_IRStatus.Text == "Status: Standby",
                         name + ": IR stream, live config (sent by the IR thread) and Stop (" + watch.ElapsedMilliseconds + "ms)");
+                    Check(closes_streaming == 0,
+                        name + ": Stop doesn't close the controller while the IR thread reads it (that crashed)");
                     File.Delete("IRcamera.png");
                 }
 

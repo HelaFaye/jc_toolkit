@@ -230,6 +230,8 @@ namespace CppWinFormJoy
         {
             if (fake == null)
                 native_hid_close(dev);
+            else
+                fake.closes++;
         }
 
         // Software controller used by --selftest and --demo instead of a real device.
@@ -337,6 +339,21 @@ namespace CppWinFormJoy
         static readonly bool traffic_timestamps = Environment.GetEnvironmentVariable("JCTOOL_TIMESTAMPS") == "1";
         static readonly System.Diagnostics.Stopwatch traffic_clock = System.Diagnostics.Stopwatch.StartNew();
 
+        // traffic_log.txt stays open instead of being reopened for every packet (twice per IR
+        // fragment). AutoFlush keeps it complete if the app crashes. Both the UI and the IR
+        // thread can log, so writes are locked.
+        static readonly object traffic_lock = new object();
+        static StreamWriter traffic_writer;
+
+        static void traffic_append(string text)
+        {
+            lock (traffic_lock) {
+                if (traffic_writer == null)
+                    traffic_writer = new StreamWriter("./traffic_log.txt", true) { AutoFlush = true };
+                traffic_writer.Write(text);
+            }
+        }
+
         // With JCTOOL_TIMESTAMPS=1 and -d, log any traced step that takes 30ms or more.
         public static long trace_start()
         {
@@ -351,7 +368,7 @@ namespace CppWinFormJoy
             if (took < 30)
                 return;
             try {
-                File.AppendAllText("./traffic_log.txt", String.Format("[{0,10:F1}] SLOW {1}: {2}ms\n\n",
+                traffic_append(String.Format("[{0,10:F1}] SLOW {1}: {2}ms\n\n",
                     traffic_clock.Elapsed.TotalMilliseconds, what, took));
             }
             catch (Exception) {
@@ -370,7 +387,7 @@ namespace CppWinFormJoy
                 if (zero_length_read)
                     sb.Append("Requested hid read length was 0 bytes.");
                 sb.Append("\n\n");
-                File.AppendAllText("./traffic_log.txt", sb.ToString());
+                traffic_append(sb.ToString());
             }
             catch (Exception) {
                 enable_traffic_dump = false;

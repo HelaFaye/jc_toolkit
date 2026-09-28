@@ -36,6 +36,7 @@ namespace CppWinFormJoy
         byte ir_mode;
         byte ir_max_frag;
         public int ir_frames_sent;
+        public int closes;
         public int ir_register_writes;
         public int ir_register_write_thread;
         public int ir_fragment_delay_ms; // > 0: pace IR fragments like real hardware
