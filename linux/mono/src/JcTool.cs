@@ -1518,7 +1518,9 @@ namespace CppWinFormJoy
                             //debug
                            // printf("%02X Frag: Copy\n", got_frag_no);
 
+                            long __trace1 = trace_start();
                             FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                            trace_slow("status label", __trace1);
                             elapsed_time = (int)sw.ElapsedMilliseconds;
                         }
 
@@ -1526,7 +1528,9 @@ namespace CppWinFormJoy
                         if (got_frag_no == ir_max_frag_no || mode != 0x07) {
                             // Update Viewport
                             elapsed_time2 = (int)sw.ElapsedMilliseconds - elapsed_time2;
+                            long __trace2 = trace_start();
                             FormJoy.myform1.setIRPictureWindow(buf_image, true);
+                            trace_slow("draw IR frame", __trace2);
 
                             //debug
                             //printf("%02X Frag: Draw -------\n", got_frag_no);
@@ -1539,15 +1543,19 @@ namespace CppWinFormJoy
                             noise_level = (float)(*(u16*)&buf_reply[57]) / ((float)(*(u16*)&buf_reply[55]) + 1.0f);
                             white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                             avg_intensity_percent = (int)((buf_reply[53] * 100) / 255);
+                            long __trace3 = trace_start();
                             FormJoy.myform1.lbl_IRHelp.Text = String.Format("Amb Noise: {0:f2},  Int: {1:D}%,  FPS: {2:D} ({3:D}ms)\nEXFilter: {4:D},  White Px: {5:D}%,  EXF Int: {6:D}",
                                 noise_level, avg_intensity_percent, elapsed_time2 > 0 ? (int)(1000 / elapsed_time2) : 0, elapsed_time2, *(u16*)&buf_reply[57], white_pixels_percent, buf_reply[54]);
+                            trace_slow("stats label", __trace3);
 
                             elapsed_time2 = (int)sw.ElapsedMilliseconds;
 
                             if (initialization != 0)
                                 initialization--;
                         }
+                        long __trace4 = trace_start();
                         Application.DoEvents();
+                        trace_slow("DoEvents", __trace4);
                     }
                     // Repeat/Missed fragment
                     else if (got_frag_no != 0 || previous_frag_no != 0) {
@@ -1650,9 +1658,13 @@ namespace CppWinFormJoy
                         ir_status.Append(String.Format("{0,3:F0}", (float)got_frag_no / (float)(ir_max_frag_no + 1) * 100.0f));
                         ir_status.Append("% - ");
 
+                        long __trace5 = trace_start();
                         FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                        trace_slow("status label", __trace5);
                         elapsed_time = (int)sw.ElapsedMilliseconds;
+                        long __trace6 = trace_start();
                         Application.DoEvents();
+                        trace_slow("DoEvents", __trace6);
                     }
                 
                     // Streaming start
@@ -1669,9 +1681,13 @@ namespace CppWinFormJoy
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
 
+                        long __trace7 = trace_start();
                         FormJoy.myform1.lbl_IRStatus.Text = (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                        trace_slow("status label", __trace7);
                         elapsed_time = (int)sw.ElapsedMilliseconds;
+                        long __trace8 = trace_start();
                         Application.DoEvents();
+                        trace_slow("DoEvents", __trace8);
 
                         previous_frag_no = 0;
                     }

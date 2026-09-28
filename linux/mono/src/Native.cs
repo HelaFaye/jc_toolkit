@@ -267,11 +267,9 @@ namespace CppWinFormJoy
                 length = OutputReportLength;
             }
 
-            // IR/NFC MCU reports (0x11) are sent in fast bursts while acknowledging IR
-            // fragments. On Windows each write blocks until it is sent, which spaces them out;
-            // hidraw only queues it, so they reach the controller back to back, and the Joy-Con
-            // drops output reports that arrive faster than its ~15ms report cycle. A dropped ACK
-            // stalls the transfer for 1 second. Keep them at least mcu_write_gap_ms apart.
+            // Optional minimum spacing between IR/NFC MCU reports (0x11), in case a controller
+            // drops output reports that arrive back to back (hidraw queues writes, Windows blocks).
+            // Off by default: a real Joy-Con (R) log showed it answering every ACK within ~15ms.
             if (data[0] == 0x11 && fake == null && mcu_write_gap_ms > 0) {
                 long wait = mcu_write_gap_ms - (write_clock.ElapsedMilliseconds - last_mcu_write_ms);
                 if (wait > 0)
@@ -283,7 +281,9 @@ namespace CppWinFormJoy
 
             if (fake != null)
                 return fake.Write(data, length);
+            long write_start = trace_start();
             int res = native_hid_write(dev, data, (UIntPtr)length);
+            trace_slow("hid_write", write_start);
             if (data[0] == 0x11)
                 last_mcu_write_ms = write_clock.ElapsedMilliseconds;
             return res;
@@ -291,8 +291,8 @@ namespace CppWinFormJoy
 
         static readonly System.Diagnostics.Stopwatch write_clock = System.Diagnostics.Stopwatch.StartNew();
         static long last_mcu_write_ms = -1000;
-        // JCTOOL_MCU_WRITE_GAP_MS overrides the spacing (0 turns it off).
-        static readonly int mcu_write_gap_ms = ParseGap(Environment.GetEnvironmentVariable("JCTOOL_MCU_WRITE_GAP_MS"), 15);
+        // JCTOOL_MCU_WRITE_GAP_MS=15 (for example) turns the spacing on.
+        static readonly int mcu_write_gap_ms = ParseGap(Environment.GetEnvironmentVariable("JCTOOL_MCU_WRITE_GAP_MS"), 0);
 
         static int ParseGap(string value, int fallback)
         {
@@ -336,6 +336,27 @@ namespace CppWinFormJoy
         // the log matches the Windows build's format.
         static readonly bool traffic_timestamps = Environment.GetEnvironmentVariable("JCTOOL_TIMESTAMPS") == "1";
         static readonly System.Diagnostics.Stopwatch traffic_clock = System.Diagnostics.Stopwatch.StartNew();
+
+        // With JCTOOL_TIMESTAMPS=1 and -d, log any traced step that takes 30ms or more.
+        public static long trace_start()
+        {
+            return traffic_timestamps ? traffic_clock.ElapsedMilliseconds : 0;
+        }
+
+        public static void trace_slow(string what, long start)
+        {
+            if (!traffic_timestamps || !enable_traffic_dump)
+                return;
+            long took = traffic_clock.ElapsedMilliseconds - start;
+            if (took < 30)
+                return;
+            try {
+                File.AppendAllText("./traffic_log.txt", String.Format("[{0,10:F1}] SLOW {1}: {2}ms\n\n",
+                    traffic_clock.Elapsed.TotalMilliseconds, what, took));
+            }
+            catch (Exception) {
+            }
+        }
 
         static void traffic_log(string prefix, u8* data, int length, bool zero_length_read)
         {

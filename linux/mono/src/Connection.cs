@@ -156,12 +156,16 @@ namespace CppWinFormJoy
             // Writes only change the emulated controller's memory.
             if (args.Length > 0 && args[0] == "--demo") {
                 int type = Jc.PROCON;
-                if (args.Length > 1 && args[1] == "l")
-                    type = Jc.JOYCON_L;
-                else if (args.Length > 1 && args[1] == "r")
-                    type = Jc.JOYCON_R;
+                int used = 1;
+                if (args.Length > 1 && (args[1] == "l" || args[1] == "r" || args[1] == "pro")) {
+                    type = args[1] == "l" ? Jc.JOYCON_L : args[1] == "r" ? Jc.JOYCON_R : Jc.PROCON;
+                    used = 2;
+                }
                 Jc.fake = new FakeJoyCon(type);
-                args = new string[0];
+                // Keep any following option (-l, -d, -f) for the normal handling below.
+                string[] rest = new string[args.Length - used];
+                Array.Copy(args, used, rest, 0, rest.Length);
+                args = rest;
             }
 
             try {
