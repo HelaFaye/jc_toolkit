@@ -180,7 +180,6 @@ namespace CppWinFormJoy
 
                 if (type == Jc.JOYCON_R) {
                     File.Delete("IRcamera.png");
-                    Jc.ir_quick_capture = false; // JCTOOL_IR_QUICK=0
                     int ir_res = form.CaptureIR();
                     int capture_fragments = fake.ir_frames_sent;
                     Check(ir_res == 0 && File.Exists("IRcamera.png") && fake.ir_frames_sent >= 256,
@@ -196,10 +195,13 @@ namespace CppWinFormJoy
                     Check(Jc.ir_last_frame_missing == 0 && capture_fragments <= 3 * 256 + 16,
                         name + ": IR capture with auto exposure saves a complete frame in 3 frames (" + capture_fragments + " fragments)");
 
-                    // Quick capture (the default): 2 frames, still complete.
-                    Jc.ir_quick_capture = true;
+                    // "Quick capture" option: 2 frames, still complete.
+                    Check(!form.IRQuickCaptureOption.Checked && !Jc.ir_quick_capture && form.IRQuickCaptureOption.Visible,
+                        name + ": IR Quick capture option shown, off by default");
+                    form.IRQuickCaptureOption.Checked = true;
                     ir_res = form.CaptureIR();
                     int quick_fragments = fake.ir_frames_sent;
+                    form.IRQuickCaptureOption.Checked = false;
                     Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && quick_fragments <= 2 * 256 + 16 && File.Exists("IRcamera.png"),
                         name + ": IR quick capture saves a complete frame in 2 frames (" + quick_fragments + " fragments)");
                     File.Delete("IRcamera.png");

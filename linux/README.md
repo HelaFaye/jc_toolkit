@@ -219,16 +219,15 @@ works. They behave exactly like on Windows.
 
 A full-resolution (240x320) frame is 256 fragments, and the Joy-Con sends about
 one every 15-30ms over Bluetooth, so a frame takes 5-9 seconds. Capture adjusts
-the exposure during the first frame and saves the second, complete frame (about
-19 seconds at 240x320). Lower resolutions are much faster (120x160 is a quarter
-of the data).
+the exposure at the start of the second frame and saves the next complete frame
+(about 30 seconds at 240x320). Lower resolutions are much faster (120x160 is a
+quarter of the data).
 
-Set these when starting the app, e.g. `JCTOOL_IR_QUICK=0 mono build/jctool.exe`:
+**Quick capture** (IR Camera Settings, under Auto Exposure; off by default):
+Capture adjusts the exposure during the first frame and saves the second
+(about 19 seconds at 240x320).
 
-| Variable | Effect |
-|---|---|
-| `JCTOOL_IR_QUICK=0` | Capture like the Windows build: adjust the exposure at the start of the second frame, then save the next complete frame (3 frames, about 30 seconds at 240x320). |
-| `JCTOOL_TIMESTAMPS=1` | With `-d`, add millisecond timestamps to `traffic_log.txt`. |
+`JCTOOL_TIMESTAMPS=1` with `-d` adds millisecond timestamps to `traffic_log.txt`.
 
 ## Troubleshooting
 

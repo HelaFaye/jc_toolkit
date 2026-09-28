@@ -63,6 +63,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal Image PreviewImage { get { return this.pictureBoxPreview.Image; } }
     internal void RefreshPreview() { update_colors_from_spi(false); }
     internal int CaptureIR() { enable_IRVideoPhoto = false; return prepareSendIRConfig(true); }
+    internal CheckBox IRQuickCaptureOption { get { return this.chkBox_IRQuickCapture; } }
+    private CheckBox chkBox_IRQuickCapture;
     internal void ClickIRStream() { btn_getVideo_Click(null, EventArgs.Empty); }
     internal void ClickIRConfigLive() { btn_IRConfigLive_Click(null, EventArgs.Empty); }
 
@@ -147,6 +149,23 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.chkBox_IRDimLeds.CheckedChanged      += new EventHandler(this.IRLeds_checkedChanged);
         this.chkBox_IRDenoise.CheckedChanged      += new EventHandler(this.IRDenoise_checkedChanged);
         this.chkBox_IRAutoExposure.CheckedChanged += new EventHandler(this.IRAutoExposure_checkedChanged);
+
+        // Linux: "Quick capture" option, under Auto Exposure (whose box was taller than its text).
+        this.chkBox_IRAutoExposure.Height = 36;
+        this.chkBox_IRQuickCapture = new CheckBox();
+        this.chkBox_IRQuickCapture.CheckAlign = System.Drawing.ContentAlignment.MiddleRight;
+        this.chkBox_IRQuickCapture.Font       = this.chkBox_IRAutoExposure.Font;
+        this.chkBox_IRQuickCapture.ForeColor  = this.chkBox_IRAutoExposure.ForeColor;
+        this.chkBox_IRQuickCapture.Location   = new System.Drawing.Point(109, 199);
+        this.chkBox_IRQuickCapture.Margin     = new System.Windows.Forms.Padding(0);
+        this.chkBox_IRQuickCapture.Name       = "chkBox_IRQuickCapture";
+        this.chkBox_IRQuickCapture.Size       = new System.Drawing.Size(115, 21);
+        this.chkBox_IRQuickCapture.Text       = "Quick capture";
+        this.chkBox_IRQuickCapture.CheckedChanged += (sender, e) => { ir_quick_capture = this.chkBox_IRQuickCapture.Checked; };
+        this.grpBox_IRSettings.Controls.Add(this.chkBox_IRQuickCapture);
+        this.toolTip1.SetToolTip(this.chkBox_IRQuickCapture,
+            "Capture: adjust the exposure during the first frame and save the second.\n" +
+            "About a third faster. Off: like the original (Windows) version.");
 
         this.toolTip1.SetToolTip(this.label_sn, "Click here to change your S/N");
         this.toolTip1.SetToolTip(this.textBox_vib_loop_times,

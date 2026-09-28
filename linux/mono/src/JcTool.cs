@@ -1424,12 +1424,11 @@ namespace CppWinFormJoy
         public static volatile System.Threading.Thread ir_worker;
         public static int ir_last_frame_missing; // fragments missing from the last finished IR frame
 
-        // Linux options (environment variables):
-        // JCTOOL_IR_QUICK=0    Capture adjusts the exposure at the start of the second frame, like the
-        //                      Windows build, and saves the third. By default (quick) it adjusts during
-        //                      the first frame and saves the second: ~11s faster at 240x320 on a
-        //                      Joy-Con (R), and the adjusted exposure shows in the saved image.
-        public static bool ir_quick_capture = Environment.GetEnvironmentVariable("JCTOOL_IR_QUICK") != "0";
+        // Linux: the "Quick capture" option in the IR camera settings (off by default). Capture then
+        // adjusts the exposure during the first frame and saves the second, instead of adjusting at
+        // the start of the second frame and saving the next complete one: ~11s faster at 240x320
+        // on a Joy-Con (R).
+        public static bool ir_quick_capture;
 
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
@@ -1624,7 +1623,8 @@ namespace CppWinFormJoy
             int incomplete_retries = 0;
             bool ir_exposure_adjusted = false;
             memset(frag_seen, 0, 256);
-            trace_note("IR: quick capture " + (ir_quick_capture ? "on" : "off"));
+            bool quick_capture = ir_quick_capture && !enable_IRVideoPhoto; // Captures only; read once per run
+            trace_note("IR: quick capture " + (quick_capture ? "on" : "off"));
             int max_pixels = ((ir_max_frag_no < 218 ? ir_max_frag_no : 217) + 1) * 300;
             int white_pixels_percent = 0;
 
@@ -1845,10 +1845,10 @@ namespace CppWinFormJoy
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
                         frag_seen[got_frag_no] = 1;
 
-                        // Linux, quick capture (default): adjust the exposure on the first fragment of
+                        // Linux, "Quick capture" option: adjust the exposure on the first fragment of
                         // the first frame, so that frame takes the dropped fragment and the
                         // second frame is saved (2 frames instead of 3).
-                        if (ir_quick_capture && enable_IRAutoExposure && initialization == 2 && !ir_exposure_adjusted) {
+                        if (quick_capture && enable_IRAutoExposure && initialization == 2 && !ir_exposure_adjusted) {
                             white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                             ir_sensor_auto_exposure(white_pixels_percent);
                             ir_exposure_adjusted = true;
