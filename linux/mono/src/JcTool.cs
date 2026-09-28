@@ -1431,6 +1431,34 @@ namespace CppWinFormJoy
         public static bool ir_quick_capture;
         public static bool ir_last_capture_stale; // The camera didn't apply the capture's settings
 
+        // Linux: true when a frame's pixels line up as rows of another resolution's width, i.e. the
+        // camera kept its previous resolution. A real image is smoothest (least change between
+        // vertically neighboring pixels) at its own width. On a Joy-Con (R), good frames were
+        // 1.25-1.75x rougher at any other width; stuck frames were 30-100x smoother at 320.
+        public static bool ir_frame_has_other_width(u8* image, int max_frag_no) {
+            int pixels = (max_frag_no + 1) * 300;
+            int width = max_frag_no == 0x3f ? 160 : max_frag_no == 0x0f ? 80 : max_frag_no == 0x03 ? 40 : 320;
+            if (width == 320)
+                return false;
+            double own = vertical_roughness(image, pixels, width);
+            if (own < 1.0)
+                return false; // (Almost) uniform, e.g. black: nothing to tell by
+            foreach (int other in new[] { 320, 160, 80, 40 }) {
+                if (other == width || pixels % other != 0 || pixels / other < 4)
+                    continue;
+                if (vertical_roughness(image, pixels, other) < own * 0.5)
+                    return true;
+            }
+            return false;
+        }
+
+        static double vertical_roughness(u8* image, int pixels, int width) {
+            long sum = 0;
+            for (int i = 0; i + width < pixels; i++)
+                sum += Math.Abs(image[i] - image[i + width]);
+            return (double)sum / (pixels - width);
+        }
+
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
         static string ir_pending_help;
@@ -1903,15 +1931,22 @@ namespace CppWinFormJoy
                             else
                                 initialization--;
 
-                            // Linux: the first frame of a run carries placeholder stats. If the frame
-                            // that ends a capture still has them, the camera didn't apply the new
-                            // settings (seen once: a 120x160 capture that kept sending 240x320 rows).
+                            // Linux: check that the camera applied the capture's settings. The first
+                            // frame of a run is a leftover frame from before. A 120x160 capture was
+                            // seen to keep sending 240x320 rows (cut into 120x160's 64 fragments),
+                            // either repeating the leftover frame or as new frames.
                             long frame_stats = ((long)buf_reply[53] << 32) | ((long)buf_reply[54] << 16) | *(u16*)&buf_reply[55];
                             if (frames_done++ == 0)
                                 first_frame_stats = frame_stats;
-                            else if (initialization == 0 && mode == 0x07 && !enable_IRVideoPhoto && frame_stats == first_frame_stats) {
-                                ir_last_capture_stale = true;
-                                trace_note("IR: the saved frame still has the first frame's placeholder stats");
+                            else if (initialization == 0 && mode == 0x07 && !enable_IRVideoPhoto) {
+                                if (frame_stats == first_frame_stats) {
+                                    ir_last_capture_stale = true;
+                                    trace_note("IR: the saved frame repeats the leftover first frame");
+                                }
+                                else if (ir_frame_has_other_width(buf_image, ir_max_frag_no)) {
+                                    ir_last_capture_stale = true;
+                                    trace_note("IR: the saved frame has rows of another resolution");
+                                }
                             }
                         }
                     }

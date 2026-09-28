@@ -229,6 +229,17 @@ namespace CppWinFormJoy
                         name + ": IR capture sets the camera up again when it didn't apply the settings");
                     File.Delete("IRcamera.png");
 
+                    // The camera keeps its old resolution but sends new frames (real stats):
+                    // detected from the image layout.
+                    form.SelectIRResolution60p(true);
+                    fake.ir_stuck_captures = 1;
+                    sets_before = fake.ir_mode_sets;
+                    ir_res = form.CaptureIR();
+                    Check(ir_res == 0 && fake.ir_mode_sets - sets_before == 2,
+                        name + ": IR capture sets the camera up again when it kept the old resolution");
+                    form.SelectIRResolution60p(false);
+                    File.Delete("IRcamera.png");
+
                     // Twice in a row: report it instead of "Done".
                     fake.ir_stale_captures = 2;
                     ir_res = form.CaptureIR();

@@ -39,6 +39,8 @@ namespace CppWinFormJoy
         public int closes;
         public int ir_white_pixels;
         public int ir_stale_captures;
+        public int ir_stuck_captures;  // runs that keep sending 240x320 rows with real stats
+        bool ir_stuck_run;
         public int ir_mode_sets;
         bool ir_stale_run;
         public int ir_register_writes;
@@ -203,6 +205,9 @@ namespace CppWinFormJoy
                 ir_stale_run = ir_stale_captures > 0;
                 if (ir_stale_captures > 0)
                     ir_stale_captures--;
+                ir_stuck_run = ir_stuck_captures > 0;
+                if (ir_stuck_captures > 0)
+                    ir_stuck_captures--;
                 r[15] = 0x0b;
             }
             else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
@@ -251,9 +256,19 @@ namespace CppWinFormJoy
                 int white = placeholder ? 5600 : ir_white_pixels; // white pixels, counted on the full sensor
                 r[55] = (byte)(white & 0xFF);
                 r[56] = (byte)(white >> 8);
-                if (ir_mode == 0x07)
-                    for (int i = 0; i < 300; i++)
-                        r[59 + i] = (byte)(((frag * 300 + i) * 255 / ((ir_max_frag + 1) * 300)) ^ ((i % 20) < 2 ? 0xFF : 0));
+                if (ir_mode == 0x07 && ir_stuck_run)
+                    for (int i = 0; i < 300; i++)   // 320 pixel rows: left half dark, right half bright
+                        r[59 + i] = (byte)(((frag * 300 + i) % 320) < 160 ? 30 : 200);
+                else if (ir_mode == 0x07) {
+                    // Test image at the current resolution: brighter down the rows, a slight ramp
+                    // across, and a white line every 20 columns (rows once rotated for display).
+                    int width = ir_max_frag == 0x3f ? 160 : ir_max_frag == 0x0f ? 80 : ir_max_frag == 0x03 ? 40 : 320;
+                    int height = (ir_max_frag + 1) * 300 / width;
+                    for (int i = 0; i < 300; i++) {
+                        int x = (frag * 300 + i) % width, y = (frag * 300 + i) / width;
+                        r[59 + i] = (x % 20) < 2 ? (byte)0xFF : (byte)(y * 200 / height + x * 50 / width);
+                    }
+                }
                 if (ir_fragment_delay_ms > 0)
                     Thread.Sleep(ir_fragment_delay_ms);
                 replies.Enqueue(r);
