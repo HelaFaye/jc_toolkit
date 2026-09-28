@@ -1425,8 +1425,11 @@ namespace CppWinFormJoy
         public static int ir_last_frame_missing; // fragments missing from the last finished IR frame
 
         // Linux options (environment variables):
-        // JCTOOL_IR_QUICK=1    Capture adjusts the exposure during the first frame and saves the second.
-        public static bool ir_quick_capture = Environment.GetEnvironmentVariable("JCTOOL_IR_QUICK") == "1";
+        // JCTOOL_IR_QUICK=0    Capture adjusts the exposure at the start of the second frame, like the
+        //                      Windows build, and saves the third. By default (quick) it adjusts during
+        //                      the first frame and saves the second: ~11s faster at 240x320 on a
+        //                      Joy-Con (R), and the adjusted exposure shows in the saved image.
+        public static bool ir_quick_capture = Environment.GetEnvironmentVariable("JCTOOL_IR_QUICK") != "0";
 
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
@@ -1842,7 +1845,7 @@ namespace CppWinFormJoy
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
                         frag_seen[got_frag_no] = 1;
 
-                        // Linux, JCTOOL_IR_QUICK=1: adjust the exposure on the first fragment of
+                        // Linux, quick capture (default): adjust the exposure on the first fragment of
                         // the first frame, so that frame takes the dropped fragment and the
                         // second frame is saved (2 frames instead of 3).
                         if (ir_quick_capture && enable_IRAutoExposure && initialization == 2 && !ir_exposure_adjusted) {
