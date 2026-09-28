@@ -189,6 +189,16 @@ namespace CppWinFormJoy
                         File.Delete("IRcamera.png");
                     }
 
+                    // The Joy-Con skips a fragment near the end of the saved frame and doesn't
+                    // resend it before the last one. The capture must not save that frame.
+                    fake.ir_skip_fragment = 253;
+                    fake.ir_ignore_resend = true;
+                    ir_res = form.CaptureIR();
+                    fake.ir_ignore_resend = false;
+                    Check(ir_res == 0 && fake.ir_skip_fragment == -1 && Jc.ir_last_frame_missing == 0,
+                        name + ": IR capture saves a complete frame after a fragment was skipped");
+                    File.Delete("IRcamera.png");
+
                     // On XWayland, window event processing can block for about a second at a
                     // time. Simulate that: the capture must still finish at full speed.
                     fake.ir_fragment_delay_ms = 5; // ~2.6s per capture, like hardware

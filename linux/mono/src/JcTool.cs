@@ -1422,6 +1422,7 @@ namespace CppWinFormJoy
         // frames are handed to the UI thread. Only the newest of each is kept, so a stalled UI
         // never slows the transfer down.
         public static volatile System.Threading.Thread ir_worker;
+        public static int ir_last_frame_missing; // fragments missing from the last finished IR frame
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
         static string ir_pending_help;
@@ -1607,6 +1608,13 @@ namespace CppWinFormJoy
             int missed_packet_no = 0;
             bool missed_packet = false;
             int initialization = 2;
+            // Linux: which fragments of the current frame arrived. The Windows code counted a
+            // frame as done when its last fragment came in order, even if an earlier one was
+            // skipped and not resent yet, so a saved capture could keep a strip of the previous
+            // frame (seen as a bar at the image edge). The saved frame must now be complete.
+            u8* frag_seen = stackalloc u8[256];
+            int incomplete_retries = 0;
+            memset(frag_seen, 0, 256);
             int max_pixels = ((ir_max_frag_no < 218 ? ir_max_frag_no : 217) + 1) * 300;
             int white_pixels_percent = 0;
 
@@ -1669,6 +1677,7 @@ namespace CppWinFormJoy
                         }
                         else if (mode == 0x07) {
                             memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
+                            frag_seen[got_frag_no] = 1;
 
                             // Auto exposure.
                             // TODO: Fix placement, so it doesn't drop next fragment.
@@ -1736,6 +1745,7 @@ namespace CppWinFormJoy
                                 buf[13] = 0x00;
 
                                 memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
+                                frag_seen[got_frag_no] = 1;
 
                                 previous_frag_no = got_frag_no;
                                 missed_packet_no = got_frag_no - 1;
@@ -1754,6 +1764,7 @@ namespace CppWinFormJoy
                                 hid_write(handle, buf, 49);
 
                                 memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
+                                frag_seen[got_frag_no] = 1;
 
                                 previous_frag_no = got_frag_no;
                             }
@@ -1771,6 +1782,7 @@ namespace CppWinFormJoy
                             hid_write(handle, buf, 49);
 
                             memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
+                            frag_seen[got_frag_no] = 1;
 
                             previous_frag_no = got_frag_no;
                             missed_packet = false;
@@ -1815,6 +1827,7 @@ namespace CppWinFormJoy
                         hid_write(handle, buf, 49);
 
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
+                        frag_seen[got_frag_no] = 1;
 
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
@@ -1846,8 +1859,25 @@ namespace CppWinFormJoy
 
                         elapsed_time2 = (int)sw.ElapsedMilliseconds;
 
-                        if (initialization != 0)
-                            initialization--;
+                        int missing = 0;
+                        if (mode == 0x07) {
+                            for (int i = 0; i <= ir_max_frag_no; i++)
+                                if (frag_seen[i] == 0)
+                                    missing++;
+                            if (missing > 0)
+                                trace_note("IR: frame done with " + missing + " fragment(s) not received");
+                        }
+                        memset(frag_seen, 0, 256);
+                        ir_last_frame_missing = missing;
+
+                        if (initialization != 0) {
+                            // Linux: don't finish a capture on an incomplete frame; take the next
+                            // one instead (a few times at most, so a capture always ends).
+                            if (initialization == 1 && missing > 0 && incomplete_retries < 3)
+                                incomplete_retries++;
+                            else
+                                initialization--;
+                        }
                     }
                 }
                 // Empty IR report. Send Ack again. Otherwise, it fallbacks to high latency mode (30ms per data fragment)

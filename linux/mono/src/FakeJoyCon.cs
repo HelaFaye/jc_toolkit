@@ -39,7 +39,10 @@ namespace CppWinFormJoy
         public int closes;
         public int ir_register_writes;
         public int ir_register_write_thread;
-        public int ir_fragment_delay_ms; // > 0: pace IR fragments like real hardware
+        public int ir_fragment_delay_ms;
+        public int ir_skip_fragment = -1;  // >= 0: skip this fragment once, in the frame after the first
+        public bool ir_ignore_resend;      // carry on after a skip instead of resending, like a real Joy-Con often does
+        int ir_last_frag; // > 0: pace IR fragments like real hardware
 
         public FakeJoyCon(int type)
         {
@@ -210,6 +213,13 @@ namespace CppWinFormJoy
             else if (data[10] == 0x03 && data[11] == 0x00 && mcu_state == 5 && ir_mode != 0) {
                 // IR fragment ACK: send the next fragment of a test pattern (diagonal gradient)
                 int frag = data[12] == 0x01 ? data[13] : (ir_frames_sent == 0 ? 0 : (data[14] + 1) % (ir_max_frag + 1));
+                if (data[12] == 0x01 && ir_ignore_resend)
+                    frag = (ir_last_frag + 1) % (ir_max_frag + 1);
+                if (frag == ir_skip_fragment && ir_frames_sent > ir_max_frag + 1) {
+                    frag++;
+                    ir_skip_fragment = -1;
+                }
+                ir_last_frag = frag;
                 var r = McuReport(0x03);
                 r[50] = 0x00;
                 r[51] = ir_mode;
