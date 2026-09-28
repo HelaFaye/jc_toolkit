@@ -69,7 +69,7 @@ You should see a Mono version (6.8 or newer), a compiler version,
 ```sh
 git clone https://github.com/HelaFaye/jc_toolkit.git
 cd jc_toolkit
-git checkout claude/determined-cray-ubv8bw
+git checkout Linux
 cd linux/mono
 make
 ```
