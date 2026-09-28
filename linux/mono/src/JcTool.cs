@@ -1425,10 +1425,11 @@ namespace CppWinFormJoy
         public static int ir_last_frame_missing; // fragments missing from the last finished IR frame
 
         // Linux: the "Quick capture" option in the IR camera settings (off by default). Capture then
-        // adjusts the exposure during the first frame and saves the second, instead of adjusting at
-        // the start of the second frame and saving the next complete one: ~11s faster at 240x320
-        // on a Joy-Con (R).
+        // skips the auto exposure adjustment, uses the Exposure value as set and saves the second
+        // frame, instead of adjusting at the start of the second frame and saving the next complete
+        // one: ~11s faster at 240x320 on a Joy-Con (R).
         public static bool ir_quick_capture;
+        public static bool ir_last_capture_stale; // The camera didn't apply the capture's settings
 
         static readonly object ir_ui_lock = new object();
         static string ir_pending_status;
@@ -1622,6 +1623,9 @@ namespace CppWinFormJoy
             u8* frag_seen = stackalloc u8[256];
             int incomplete_retries = 0;
             bool ir_exposure_adjusted = false;
+            int frames_done = 0;
+            long first_frame_stats = -1;
+            ir_last_capture_stale = false;
             memset(frag_seen, 0, 256);
             bool quick_capture = ir_quick_capture && !enable_IRVideoPhoto; // Captures only; read once per run
             trace_note("IR: quick capture " + (quick_capture ? "on" : "off"));
@@ -1699,7 +1703,8 @@ namespace CppWinFormJoy
                             // and doesn't resend it, so that frame is always incomplete. While a
                             // capture waits for a complete frame, adjust only once, so the retry
                             // frames can come through whole. Streaming adjusts every frame as before.
-                            if (enable_IRAutoExposure && initialization < 2 && got_frag_no == 0
+                            // "Quick capture" skips it and uses the Exposure value as set.
+                            if (enable_IRAutoExposure && !quick_capture && initialization < 2 && got_frag_no == 0
                                 && (initialization == 0 || !ir_exposure_adjusted)) {
                                 white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
                                 ir_sensor_auto_exposure(white_pixels_percent);
@@ -1849,15 +1854,6 @@ namespace CppWinFormJoy
                         memcpy(buf_image + (300 * got_frag_no), buf_reply + 59, 300);
                         frag_seen[got_frag_no] = 1;
 
-                        // Linux, "Quick capture" option: adjust the exposure on the first fragment of
-                        // the first frame, so that frame takes the dropped fragment and the
-                        // second frame is saved (2 frames instead of 3).
-                        if (quick_capture && enable_IRAutoExposure && initialization == 2 && !ir_exposure_adjusted) {
-                            white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
-                            ir_sensor_auto_exposure(white_pixels_percent);
-                            ir_exposure_adjusted = true;
-                        }
-
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
 
@@ -1906,6 +1902,17 @@ namespace CppWinFormJoy
                                 incomplete_retries++;
                             else
                                 initialization--;
+
+                            // Linux: the first frame of a run carries placeholder stats. If the frame
+                            // that ends a capture still has them, the camera didn't apply the new
+                            // settings (seen once: a 120x160 capture that kept sending 240x320 rows).
+                            long frame_stats = ((long)buf_reply[53] << 32) | ((long)buf_reply[54] << 16) | *(u16*)&buf_reply[55];
+                            if (frames_done++ == 0)
+                                first_frame_stats = frame_stats;
+                            else if (initialization == 0 && mode == 0x07 && !enable_IRVideoPhoto && frame_stats == first_frame_stats) {
+                                ir_last_capture_stale = true;
+                                trace_note("IR: the saved frame still has the first frame's placeholder stats");
+                            }
                         }
                     }
                 }

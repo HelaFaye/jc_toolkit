@@ -195,15 +195,17 @@ namespace CppWinFormJoy
                     Check(Jc.ir_last_frame_missing == 0 && capture_fragments <= 3 * 256 + 16,
                         name + ": IR capture with auto exposure saves a complete frame in 3 frames (" + capture_fragments + " fragments)");
 
-                    // "Quick capture" option: 2 frames, still complete.
+                    // "Quick capture" option: 2 frames, still complete, exposure left as set.
                     Check(!form.IRQuickCaptureOption.Checked && !Jc.ir_quick_capture && form.IRQuickCaptureOption.Visible,
                         name + ": IR Quick capture option shown, off by default");
                     form.IRQuickCaptureOption.Checked = true;
+                    decimal exposure_before = form.IRExposure;
                     ir_res = form.CaptureIR();
                     int quick_fragments = fake.ir_frames_sent;
                     form.IRQuickCaptureOption.Checked = false;
-                    Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && quick_fragments <= 2 * 256 + 16 && File.Exists("IRcamera.png"),
-                        name + ": IR quick capture saves a complete frame in 2 frames (" + quick_fragments + " fragments)");
+                    Check(ir_res == 0 && Jc.ir_last_frame_missing == 0 && quick_fragments <= 2 * 256 + 16 && File.Exists("IRcamera.png")
+                        && form.IRExposure == exposure_before,
+                        name + ": IR quick capture saves a complete frame in 2 frames without changing the exposure (" + quick_fragments + " fragments)");
                     File.Delete("IRcamera.png");
 
                     // 60x80 with 8302 white pixels (a real capture): auto exposure must adjust
@@ -217,6 +219,22 @@ namespace CppWinFormJoy
                     fake.ir_white_pixels = 0;
                     form.SelectIRResolution60p(false);
                     form.IRExposure = 300;
+                    File.Delete("IRcamera.png");
+
+                    // The camera keeps its old settings once: set it up again and capture once more.
+                    fake.ir_stale_captures = 1;
+                    int sets_before = fake.ir_mode_sets;
+                    ir_res = form.CaptureIR();
+                    Check(ir_res == 0 && fake.ir_mode_sets - sets_before == 2 && File.Exists("IRcamera.png"),
+                        name + ": IR capture sets the camera up again when it didn't apply the settings");
+                    File.Delete("IRcamera.png");
+
+                    // Twice in a row: report it instead of "Done".
+                    fake.ir_stale_captures = 2;
+                    ir_res = form.CaptureIR();
+                    Check(ir_res == 10 && form.lbl_IRStatus.Text.Contains("didn't apply"),
+                        name + ": IR capture reports when the camera keeps ignoring the settings");
+                    fake.ir_stale_captures = 0;
                     File.Delete("IRcamera.png");
 
                     // The Joy-Con skips a fragment near the end of the saved frame and doesn't

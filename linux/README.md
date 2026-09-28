@@ -239,8 +239,11 @@ the exposure at the start of the second frame and saves the next complete frame
 quarter of the data).
 
 **Quick capture** (IR Camera Settings, under Auto Exposure; off by default):
-Capture adjusts the exposure during the first frame and saves the second
-(about 19 seconds at 240x320).
+Capture skips the auto exposure adjustment, uses the Exposure value as set, and
+saves the second frame (about 19 seconds at 240x320).
+
+If the camera doesn't apply a capture's settings (rarely, it keeps the previous
+resolution), the capture sets it up again and retries once, or says so.
 
 `JCTOOL_TIMESTAMPS=1` with `-d` adds millisecond timestamps to `traffic_log.txt`.
 

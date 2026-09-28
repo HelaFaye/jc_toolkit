@@ -38,6 +38,9 @@ namespace CppWinFormJoy
         public int ir_frames_sent;
         public int closes;
         public int ir_white_pixels;
+        public int ir_stale_captures;
+        public int ir_mode_sets;
+        bool ir_stale_run;
         public int ir_register_writes;
         public int ir_register_write_thread;
         public int ir_fragment_delay_ms;
@@ -196,6 +199,10 @@ namespace CppWinFormJoy
                 ir_mode = data[13];
                 ir_max_frag = data[14];
                 ir_frames_sent = 0;
+                ir_mode_sets++;
+                ir_stale_run = ir_stale_captures > 0;
+                if (ir_stale_captures > 0)
+                    ir_stale_captures--;
                 r[15] = 0x0b;
             }
             else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
@@ -237,9 +244,13 @@ namespace CppWinFormJoy
                 r[50] = 0x00;
                 r[51] = ir_mode;
                 r[52] = (byte)frag;
-                r[53] = 0x40;                        // average intensity
-                r[55] = (byte)(ir_white_pixels & 0xFF);  // white pixels, counted on the full sensor
-                r[56] = (byte)(ir_white_pixels >> 8);
+                // Stats: the first frame of a run carries placeholder values, like a real Joy-Con.
+                // ir_stale_captures > 0: the camera "keeps its old settings" for that many runs.
+                bool placeholder = ir_frames_sent <= ir_max_frag || ir_stale_run;
+                r[53] = (byte)(placeholder ? 31 : 0x40);   // average intensity
+                int white = placeholder ? 5600 : ir_white_pixels; // white pixels, counted on the full sensor
+                r[55] = (byte)(white & 0xFF);
+                r[56] = (byte)(white >> 8);
                 if (ir_mode == 0x07)
                     for (int i = 0; i < 300; i++)
                         r[59 + i] = (byte)(((frag * 300 + i) * 255 / ((ir_max_frag + 1) * 300)) ^ ((i % 20) < 2 ? 0xFF : 0));

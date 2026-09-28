@@ -166,8 +166,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.chkBox_IRQuickCapture.CheckedChanged += (sender, e) => { ir_quick_capture = this.chkBox_IRQuickCapture.Checked; };
         this.grpBox_IRSettings.Controls.Add(this.chkBox_IRQuickCapture);
         this.toolTip1.SetToolTip(this.chkBox_IRQuickCapture,
-            "Capture: adjust the exposure during the first frame and save the second.\n" +
-            "About a third faster. Off: like the original (Windows) version.");
+            "Capture: skip the auto exposure adjustment, use the Exposure value as set\n" +
+            "and save the second frame. About a third faster. Off: like the original (Windows) version.");
 
         this.toolTip1.SetToolTip(this.label_sn, "Click here to change your S/N");
         this.toolTip1.SetToolTip(this.textBox_vib_loop_times,
@@ -2315,6 +2315,16 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             ir_image_config cfg = ir_new_config;
             res = ir_run_worker(() => ir_sensor(ref cfg));
 
+            // Linux: the camera occasionally keeps its previous settings (e.g. resolution). Set it
+            // up again and capture once more; if it still didn't apply them, say so.
+            if (res == 0 && !enable_IRVideoPhoto && ir_last_capture_stale) {
+                trace_note("IR: camera didn't apply the settings, setting it up again");
+                this.lbl_IRStatus.Text = "Status: Camera didn't apply the settings, retrying..";
+                res = ir_run_worker(() => ir_sensor(ref cfg));
+                if (res == 0 && ir_last_capture_stale)
+                    res = 10;
+            }
+
             // Get error
             switch (res) {
                 case 1:
@@ -2344,10 +2354,15 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
                 case 9:
                     error_msg = "9IRFCFG";
                     break;
+                case 10:
+                    error_msg = "10IRNOCFG";
+                    break;
                 default:
                     break;
             }
-            if (res > 0)
+            if (res == 10)
+                this.lbl_IRStatus.Text = "Status: Camera didn't apply the settings. Try again";
+            else if (res > 0)
                 this.lbl_IRStatus.Text = "Status: Error " + error_msg + "!";
         }
         // Change camera configuration
