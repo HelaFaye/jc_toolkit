@@ -131,6 +131,8 @@ run r '14\n17\n16\n1\n0\n0\n'
 check "IR: quick capture" "grep -q 'Done! Saved to IRcamera.png' out.txt"
 { printf '14\n17\n2\n'; sleep 2; printf '\n'; sleep 0.5; printf '0\n0\n'; } | env JCFAKE_TYPE=r ./jctool-cli-fake > out.txt 2>&1
 check "IR: stream updates IRstream.png, stops on Enter" "grep -q 'Status: Standby' out.txt && [ \"\$(png_size IRstream.png)\" = 240x320 ]"
+{ printf '14\n17\n3\n2\n2\n'; sleep 2; printf '\n'; sleep 0.5; printf '0\n0\n'; } | env JCFAKE_TYPE=r JCFAKE_IR_STUCK=1 ./jctool-cli-fake > out.txt 2>&1
+check "IR: stream sets the camera up again when it kept the old resolution" "grep -q 'IR mode set 1 (stuck' out.txt && grep -q 'IR mode set 2\$' out.txt && ! grep -q 'IR mode set 3' out.txt && grep -q 'Status: Standby' out.txt"
 run l '14\n0\n'
 check "IR: refused on Joy-Con (L)" "grep -q 'only on the Joy-Con (R)' out.txt"
 run l '15\n0\n'

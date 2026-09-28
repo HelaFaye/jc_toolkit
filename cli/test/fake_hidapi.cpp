@@ -44,6 +44,9 @@ struct FakeJoyCon {
     int ir_frames_sent = 0;
     int ir_frame_index = 0;
     int ir_white_pixels = 0;
+    int ir_stuck_runs = 0;              // Runs that keep sending 240x320 rows (JCFAKE_IR_STUCK)
+    bool ir_stuck_run = false;
+    int ir_mode_sets = 0;
     int ir_last_frag = 0;
     bool ir_skip_after_register_write = false;
     bool ir_skipped_for_register_write = false;
@@ -123,6 +126,11 @@ struct FakeJoyCon {
             ir_max_frag = data[14];
             ir_frames_sent = 0;
             ir_frame_index = 0;
+            ir_stuck_run = ir_stuck_runs > 0;
+            if (ir_stuck_runs > 0)
+                ir_stuck_runs--;
+            if (ir_mode == 0x07)
+                fprintf(stderr, "[fake] IR mode set %d%s\n", ++ir_mode_sets, ir_stuck_run ? " (stuck at 240x320)" : "");
             r[15] = 0x0b;
         }
         else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
@@ -165,7 +173,11 @@ struct FakeJoyCon {
             int white = leftover ? 5600 : ir_white_pixels;
             r[55] = white & 0xFF;
             r[56] = white >> 8;
-            if (ir_mode == 0x07) {
+            if (ir_mode == 0x07 && ir_stuck_run) {
+                for (int i = 0; i < 300; i++)   // 320 pixel rows: left half dark, right half bright
+                    r[59 + i] = ((frag * 300 + i) % 320) < 160 ? 30 : 200;
+            }
+            else if (ir_mode == 0x07) {
                 int width = ir_max_frag == 0x3f ? 160 : ir_max_frag == 0x0f ? 80 : ir_max_frag == 0x03 ? 40 : 320;
                 int height = (ir_max_frag + 1) * 300 / width;
                 for (int i = 0; i < 300; i++) {
@@ -287,6 +299,9 @@ int HID_API_EXPORT hid_init(void) {
             fclose(f);
         }
     }
+    const char *stuck = getenv("JCFAKE_IR_STUCK");
+    if (stuck)
+        fake.ir_stuck_runs = atoi(stuck);
     const char *white = getenv("JCFAKE_WHITE");
     if (white)
         fake.ir_white_pixels = atoi(white);

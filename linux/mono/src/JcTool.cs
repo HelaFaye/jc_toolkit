@@ -1429,7 +1429,7 @@ namespace CppWinFormJoy
         // frame, instead of adjusting at the start of the second frame and saving the next complete
         // one: ~11s faster at 240x320 on a Joy-Con (R).
         public static bool ir_quick_capture;
-        public static bool ir_last_capture_stale; // The camera didn't apply the capture's settings
+        public static bool ir_last_capture_stale; // The camera didn't apply the settings (capture, or a stream that stopped for it)
 
         // Linux: true when a frame's pixels line up as rows of another resolution's width, i.e. the
         // camera kept its previous resolution. A real image is smoothest (least change between
@@ -1652,6 +1652,7 @@ namespace CppWinFormJoy
             int incomplete_retries = 0;
             bool ir_exposure_adjusted = false;
             int frames_done = 0;
+            int stream_checks = 0, stream_stuck_frames = 0;
             long first_frame_stats = -1;
             ir_last_capture_stale = false;
             memset(frag_seen, 0, 256);
@@ -1982,6 +1983,21 @@ namespace CppWinFormJoy
                                     trace_note("IR: the saved frame has rows of another resolution");
                                 }
                             }
+                        }
+                        // Linux: the same check for a stream's first frames (a 60x80 stream was seen
+                        // sending only 240x320 rows). Two such frames in a row stop the stream, so the
+                        // caller can set the camera up again.
+                        if (enable_IRVideoPhoto && mode == 0x07 && frames_done >= 2 && stream_checks < 6) {
+                            stream_checks++;
+                            if (ir_frame_has_other_width(buf_image, ir_max_frag_no)) {
+                                if (++stream_stuck_frames >= 2) {
+                                    ir_last_capture_stale = true;
+                                    trace_note("IR: the stream has rows of another resolution, restarting it");
+                                    break;
+                                }
+                            }
+                            else
+                                stream_stuck_frames = 0;
                         }
                     }
                 }

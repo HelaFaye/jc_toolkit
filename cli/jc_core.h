@@ -122,7 +122,7 @@ extern bool ir_quick_capture;       // Capture: no auto exposure adjustment, sav
 extern bool ir_skip_leftover;       // JCTOOL_IR_SKIP_LEFTOVER=1
 extern bool ir_patient_setup;       // JCTOOL_IR_PATIENT_SETUP=1
 extern int  ir_last_frame_missing;
-extern bool ir_last_capture_stale;
+extern bool ir_last_capture_stale;  // The camera didn't apply the settings (capture, or a stream stopped for it)
 
 // Loaded HD rumble file (file_type 1: raw; 2-4: binary, converted into vib_file_converted)
 extern u8  *vib_loaded_file;

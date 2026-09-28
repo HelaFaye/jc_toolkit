@@ -263,8 +263,10 @@ quarter of the data).
 Capture skips the auto exposure adjustment, uses the Exposure value as set, and
 saves the second frame (about 19 seconds at 240x320).
 
-If the camera doesn't apply a capture's settings (rarely, it keeps the previous
-resolution), the capture sets it up again and retries once, or says so.
+If the camera doesn't apply the settings (rarely, it keeps the previous
+resolution, which shows as vertical bars), a capture sets it up again and
+retries once, or says so. A stream checks its first frames the same way and
+restarts once.
 
 `JCTOOL_TIMESTAMPS=1` with `-d` adds millisecond timestamps to `traffic_log.txt`.
 

@@ -1547,6 +1547,7 @@ int get_raw_ir_image(u8 mode, u8 show_status) {
     int incomplete_retries = 0;
     bool ir_exposure_adjusted = false;
     int frames_done = 0;
+    int stream_checks = 0, stream_stuck_frames = 0;
     long first_frame_stats = -1;
     ir_last_capture_stale = false;
     memset(frag_seen, 0, 256);
@@ -1877,6 +1878,21 @@ int get_raw_ir_image(u8 mode, u8 show_status) {
                             trace_note("IR: the saved frame has rows of another resolution");
                         }
                     }
+                }
+                // Linux: the same check for a stream's first frames (a 60x80 stream was seen
+                // sending only 240x320 rows). Two such frames in a row stop the stream, so the
+                // caller can set the camera up again.
+                if (enable_IRVideoPhoto && mode == 0x07 && frames_done >= 2 && stream_checks < 6) {
+                    stream_checks++;
+                    if (ir_frame_has_other_width(buf_image, ir_max_frag_no)) {
+                        if (++stream_stuck_frames >= 2) {
+                            ir_last_capture_stale = true;
+                            trace_note("IR: the stream has rows of another resolution, restarting it");
+                            break;
+                        }
+                    }
+                    else
+                        stream_stuck_frames = 0;
                 }
             }
         }

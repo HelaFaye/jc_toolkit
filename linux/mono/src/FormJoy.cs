@@ -2316,8 +2316,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             res = ir_run_worker(() => ir_sensor(ref cfg));
 
             // Linux: the camera occasionally keeps its previous settings (e.g. resolution). Set it
-            // up again and capture once more; if it still didn't apply them, say so.
-            if (res == 0 && !enable_IRVideoPhoto && ir_last_capture_stale) {
+            // up again and capture (or stream) once more; if it still didn't apply them, say so.
+            // A stream stopped by the user in the meantime isn't restarted.
+            bool streaming = enable_IRVideoPhoto;
+            if (res == 0 && ir_last_capture_stale && (!streaming || enable_IRVideoPhoto)) {
                 trace_note("IR: camera didn't apply the settings, setting it up again");
                 this.lbl_IRStatus.Text = "Status: Camera didn't apply the settings, retrying..";
                 res = ir_run_worker(() => ir_sensor(ref cfg));

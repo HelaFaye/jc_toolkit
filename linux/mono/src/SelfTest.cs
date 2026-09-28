@@ -317,6 +317,24 @@ namespace CppWinFormJoy
                     Check(closes_streaming == 0,
                         name + ": Stop doesn't close the controller while the IR thread reads it (that crashed)");
                     File.Delete("IRcamera.png");
+
+                    // A 60x80 stream whose camera kept sending 240x320 rows (seen on a Joy-Con (R)):
+                    // the stream stops, sets the camera up again and goes on until Stop.
+                    form.SelectIRResolution60p(true);
+                    fake.ir_stuck_captures = 1;
+                    int stream_sets = fake.ir_mode_sets;
+                    var stop = new Timer { Interval = 1500 };
+                    stop.Tick += (o, e) => { stop.Stop(); form.ClickIRStream(); };
+                    fake.ir_fragment_delay_ms = 1;
+                    stop.Start();
+                    form.ClickIRStream();
+                    stop.Stop();
+                    fake.ir_fragment_delay_ms = 0;
+                    fake.ir_stuck_captures = 0;
+                    form.SelectIRResolution60p(false);
+                    Check(fake.ir_mode_sets - stream_sets == 2 && form.lbl_IRStatus.Text == "Status: Standby",
+                        name + ": IR stream sets the camera up again when it kept the old resolution");
+                    File.Delete("IRcamera.png");
                 }
 
                 // Debug: custom command (subcmd 0x02 device info) and its reply dump

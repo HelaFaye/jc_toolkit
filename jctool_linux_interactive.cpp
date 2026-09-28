@@ -1424,8 +1424,9 @@ static void ir_run(bool stream) {
     int res = ir_sensor(cfg);
 
     // The camera occasionally keeps its previous settings (e.g. resolution). Set it
-    // up again and capture once more; if it still didn't apply them, say so.
-    if (res == 0 && !stream && ir_last_capture_stale) {
+    // up again and capture (or stream) once more; if it still didn't apply them, say so.
+    // A stream stopped with Enter in the meantime isn't restarted.
+    if (res == 0 && ir_last_capture_stale && (!stream || enable_IRVideoPhoto)) {
         trace_note("IR: camera didn't apply the settings, setting it up again");
         printf("\nStatus: Camera didn't apply the settings, retrying..\n");
         res = ir_sensor(cfg);
