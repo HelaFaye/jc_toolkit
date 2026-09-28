@@ -15,25 +15,16 @@ endif()
 
 message(STATUS "HIDAPI found: ${HIDAPI_LIBRARIES}")
 
-add_executable(jctool_test jctool_linux.cpp)
-target_include_directories(jctool_test PRIVATE ${HIDAPI_INCLUDE_DIRS})
-target_link_libraries(jctool_test PRIVATE ${HIDAPI_LIBRARIES})
-target_compile_options(jctool_test PRIVATE -Wall -Wextra -O2)
+# Named jctool-cli: the repository root already has a jctool/ folder (the Windows sources).
+add_executable(jctool-cli jctool_linux_interactive.cpp)
+target_include_directories(jctool-cli PRIVATE ${HIDAPI_INCLUDE_DIRS})
+target_link_libraries(jctool-cli PRIVATE ${HIDAPI_LIBRARIES})
+target_compile_options(jctool-cli PRIVATE -Wall -Wextra -O2)
 
-add_executable(jctool_full jctool_linux_full.cpp)
-target_include_directories(jctool_full PRIVATE ${HIDAPI_INCLUDE_DIRS})
-target_link_libraries(jctool_full PRIVATE ${HIDAPI_LIBRARIES})
-target_compile_options(jctool_full PRIVATE -Wall -Wextra -O2)
-
-add_executable(jctool jctool_linux_interactive.cpp)
-target_include_directories(jctool PRIVATE ${HIDAPI_INCLUDE_DIRS})
-target_link_libraries(jctool PRIVATE ${HIDAPI_LIBRARIES})
-target_compile_options(jctool PRIVATE -Wall -Wextra -O2)
-
-install(TARGETS jctool_test jctool_full jctool DESTINATION bin)
-install(FILES LINUX_BUILD.md README.md LICENSE DESTINATION share/doc/jctool)
+install(TARGETS jctool-cli DESTINATION bin)
+install(FILES linux/README.md README.md LICENSE DESTINATION share/doc/jctool)
 
 message(STATUS "=== Joy-Con Toolkit (Linux CLI) ===")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "Binaries: jctool_test, jctool_full, jctool")
+message(STATUS "Binary: jctool-cli")
 message(STATUS "")

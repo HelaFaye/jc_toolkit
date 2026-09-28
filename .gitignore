@@ -286,8 +286,7 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
-jctool_test
-jctool_full
+jctool-cli
 
 # Local development
 .vscode/

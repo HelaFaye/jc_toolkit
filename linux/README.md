@@ -215,6 +215,21 @@ Writes (each one can be undone from your backup):
 Leave S/N changes, calibration writes and Full Restore until everything above
 works. They behave exactly like on Windows.
 
+## Command-line tool (jctool-cli)
+
+A small interactive menu for quick checks without the window: pick a
+controller, then read device info, battery, and calibration, set the player
+LEDs, or test the rumble. It only reads from the controller's memory.
+
+```sh
+cd ~/jc_toolkit
+sudo apt install g++ libhidapi-dev   # Fedora: gcc-c++ hidapi-devel; Arch: gcc hidapi
+make -f Makefile.linux
+./jctool-cli
+```
+
+(`cmake -B build-cli && cmake --build build-cli` works too.)
+
 ## IR camera options (Linux only)
 
 A full-resolution (240x320) frame is 256 fragments, and the Joy-Con sends about

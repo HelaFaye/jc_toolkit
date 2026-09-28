@@ -1,47 +1,30 @@
-.PHONY: all clean test test-full interactive install uninstall help
+.PHONY: all clean interactive install uninstall help
 
-CC := gcc
 CXX := g++
-CFLAGS := -Wall -Wextra -O2
 CXXFLAGS := -Wall -Wextra -O2
 LDFLAGS := $(shell pkg-config --libs hidapi-hidraw)
 CPPFLAGS := $(shell pkg-config --cflags hidapi-hidraw)
 
-TARGETS := jctool_test jctool_full jctool
+# Named jctool-cli: the repository root already has a jctool/ folder (the Windows sources).
+TARGETS := jctool-cli
 
 all: $(TARGETS)
 
-jctool_test: jctool_linux.cpp
+jctool-cli: jctool_linux_interactive.cpp
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
 	@echo "[✓] Built $@"
 
-jctool_full: jctool_linux_full.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
-	@echo "[✓] Built $@"
-
-jctool: jctool_linux_interactive.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
-	@echo "[✓] Built $@"
-
-test: jctool_test
-	@echo "[*] Running minimal test..."
-	./jctool_test
-
-test-full: jctool_full
-	@echo "[*] Running full-featured test..."
-	./jctool_full
-
-interactive: jctool
+interactive: jctool-cli
 	@echo "[*] Running interactive menu..."
-	./jctool
+	./jctool-cli
 
 install: all
 	@echo "[*] Installing to /usr/local/bin..."
-	install -m 755 jctool_test jctool_full jctool /usr/local/bin/
+	install -m 755 jctool-cli /usr/local/bin/
 	@echo "[✓] Installation complete"
 
 uninstall:
-	rm -f /usr/local/bin/jctool_test /usr/local/bin/jctool_full /usr/local/bin/jctool
+	rm -f /usr/local/bin/jctool-cli
 	@echo "[✓] Uninstallation complete"
 
 clean:
@@ -50,11 +33,8 @@ clean:
 
 help:
 	@echo "Joy-Con Toolkit (Linux CLI) - Make targets:"
-	@echo "  all         - Build all binaries (default)"
-	@echo "  test        - Build and run minimal test"
-	@echo "  test-full   - Build and run full-featured test"
-	@echo "  interactive - Build and run interactive menu"
-	@echo "  install     - Install binaries to /usr/local/bin"
-	@echo "  uninstall   - Remove installed binaries"
-	@echo "  clean       - Remove build artifacts"
-	@echo "  help        - Display this help message"
+	@echo "  all         - Build jctool-cli (default)"
+	@echo "  interactive - Build and run the interactive menu"
+	@echo "  install     - Install jctool-cli to /usr/local/bin"
+	@echo "  uninstall   - Remove it from /usr/local/bin"
+	@echo "  clean       - Remove build output"
