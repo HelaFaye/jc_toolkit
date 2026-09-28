@@ -217,18 +217,39 @@ works. They behave exactly like on Windows.
 
 ## Command-line tool (jctool-cli)
 
-A small interactive menu for quick checks without the window: pick a
-controller, then read device info, battery, and calibration, set the player
-LEDs, or test the rumble. It only reads from the controller's memory.
+A text-menu version of Joy-Con Toolkit with the same features as the window, for use
+in a terminal or over SSH. It is written in C++ and needs only hidapi (no Mono).
 
 ```sh
 cd ~/jc_toolkit
 sudo apt install g++ libhidapi-dev   # Fedora: gcc-c++ hidapi-devel; Arch: gcc hidapi
 make -f Makefile.linux
-./jctool-cli
+./jctool-cli        # -l: list all HID devices first, -d: log traffic to traffic_log.txt
 ```
 
 (`cmake -B build-cli && cmake --build build-cli` works too.)
+
+It connects to the controller on start. Menu:
+
+| # | Feature |
+|---|---|
+| 1-6 | Select device, device info (FW, MAC, S/N, battery, temperature, colors), battery, player LEDs, rumble test, read calibration |
+| 7 | Colors: view and change body/buttons (and Pro Controller grips) |
+| 8, 9 | Backup the SPI flash; restore colors, S/N, user calibration, factory-reset user calibration, or a full restore (with the window's checks) |
+| 10 | Change the S/N (Joy-Con), or restore it from the backup inside the controller |
+| 11 | Edit user stick / 6-axis calibration and the stick device parameters |
+| 12 | Live button, stick and 6-axis test |
+| 13 | HD Rumble player (.bnvib, .jcvib, with equalizer and loops) and the two tunes |
+| 14 | IR camera (Joy-Con R): every setting of the window, Capture (IRcamera.png), Stream (IRstream.png, with live exposure/gain/register changes), Quick capture, and a color preview in the terminal |
+| 15 | NFC / amiibo scan with NTAG dump |
+| 16-18 | Debug custom command, HID listing, disconnect the controller |
+
+Enter stops a long operation (SPI backup, button test, stream, NFC scan). Every write asks
+for confirmation first, like the window.
+
+The protocol code (`cli/jc_core.cpp`) is ported from the Linux build's `JcTool.cs`, with
+the same Linux fixes. `cli/test/run_tests.sh` tests every menu against an emulated
+controller (no hardware needed).
 
 ## IR camera options (Linux only)
 

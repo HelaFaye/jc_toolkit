@@ -1,18 +1,30 @@
 .PHONY: all clean interactive install uninstall help
 
 CXX := g++
-CXXFLAGS := -Wall -Wextra -O2
+CXXFLAGS := -std=c++11 -Wall -Wextra -O2
 LDFLAGS := $(shell pkg-config --libs hidapi-hidraw)
 CPPFLAGS := $(shell pkg-config --cflags hidapi-hidraw)
+# jc_core.cpp is ported from jctool.cpp; keep its original expression style warning-free
+CORE_FLAGS := -Wno-parentheses -Wno-unused-variable -Wno-unused-but-set-variable
 
 # Named jctool-cli: the repository root already has a jctool/ folder (the Windows sources).
 TARGETS := jctool-cli
+OBJS := jctool_linux_interactive.o cli/jc_core.o cli/png.o
 
 all: $(TARGETS)
 
-jctool-cli: jctool_linux_interactive.cpp
-	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -o $@ $< $(LDFLAGS)
+jctool-cli: $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 	@echo "[✓] Built $@"
+
+jctool_linux_interactive.o: jctool_linux_interactive.cpp cli/jc_core.h cli/png.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+cli/jc_core.o: cli/jc_core.cpp cli/jc_core.h jctool/ir_sensor.h jctool/luts.h jctool/tune.h
+	$(CXX) $(CXXFLAGS) $(CORE_FLAGS) $(CPPFLAGS) -c -o $@ $<
+
+cli/png.o: cli/png.cpp cli/png.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 interactive: jctool-cli
 	@echo "[*] Running interactive menu..."
@@ -28,7 +40,7 @@ uninstall:
 	@echo "[✓] Uninstallation complete"
 
 clean:
-	rm -f $(TARGETS) *.o *.a *.so
+	rm -f $(TARGETS) $(OBJS)
 	@echo "[✓] Cleaned"
 
 help:
