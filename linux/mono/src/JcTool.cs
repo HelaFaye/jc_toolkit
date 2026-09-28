@@ -1414,6 +1414,21 @@ namespace CppWinFormJoy
             vline(buffer, cx, y0, y1, brightness);
         }
 
+        // The Windows code refreshed the IR status text and ran DoEvents() after every fragment
+        // (up to 512 times per capture). Under Mono, especially on XWayland, some of those calls
+        // stall for about a second while the Joy-Con waits, so refresh at most every 100ms.
+        // Finished frames are always drawn.
+        static readonly System.Diagnostics.Stopwatch ir_ui_clock = System.Diagnostics.Stopwatch.StartNew();
+        static long ir_ui_last = -1000;
+
+        static bool ir_ui_due() {
+            long now = ir_ui_clock.ElapsedMilliseconds;
+            if (now - ir_ui_last < 100)
+                return false;
+            ir_ui_last = now;
+            return true;
+        }
+
         public static int get_raw_ir_image(u8 mode, u8 show_status) {
             StringBuilder ir_status = new StringBuilder();
 
@@ -1463,6 +1478,7 @@ namespace CppWinFormJoy
                 if (buf_reply[0] == 0x31 && buf_reply[49] == 0x03 && buf_reply[51] == mode) {
                     got_frag_no = buf_reply[52];
                     if (got_frag_no == (previous_frag_no + 1) % (ir_max_frag_no + 1) || mode != 0x07) {
+                        bool ui_now = false;
                         previous_frag_no = got_frag_no;
 
                         // ACK for fragment
@@ -1518,10 +1534,13 @@ namespace CppWinFormJoy
                             //debug
                            // printf("%02X Frag: Copy\n", got_frag_no);
 
-                            long __trace1 = trace_start();
-                            FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                            trace_slow("status label", __trace1);
-                            elapsed_time = (int)sw.ElapsedMilliseconds;
+                            ui_now = ir_ui_due();
+                            if (ui_now) {
+                                long __trace1 = trace_start();
+                                FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                                trace_slow("status label", __trace1);
+                                elapsed_time = (int)sw.ElapsedMilliseconds;
+                            }
                         }
 
                         // Check if final fragment. Draw the frame.
@@ -1552,10 +1571,13 @@ namespace CppWinFormJoy
 
                             if (initialization != 0)
                                 initialization--;
+                            ui_now = true;
                         }
-                        long __trace4 = trace_start();
-                        Application.DoEvents();
-                        trace_slow("DoEvents", __trace4);
+                        if (ui_now || mode != 0x07) {
+                            long __trace4 = trace_start();
+                            Application.DoEvents();
+                            trace_slow("DoEvents", __trace4);
+                        }
                     }
                     // Repeat/Missed fragment
                     else if (got_frag_no != 0 || previous_frag_no != 0) {
@@ -1658,13 +1680,15 @@ namespace CppWinFormJoy
                         ir_status.Append(String.Format("{0,3:F0}", (float)got_frag_no / (float)(ir_max_frag_no + 1) * 100.0f));
                         ir_status.Append("% - ");
 
-                        long __trace5 = trace_start();
-                        FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                        trace_slow("status label", __trace5);
-                        elapsed_time = (int)sw.ElapsedMilliseconds;
-                        long __trace6 = trace_start();
-                        Application.DoEvents();
-                        trace_slow("DoEvents", __trace6);
+                        if (ir_ui_due()) {
+                            long __trace5 = trace_start();
+                            FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                            trace_slow("status label", __trace5);
+                            elapsed_time = (int)sw.ElapsedMilliseconds;
+                            long __trace6 = trace_start();
+                            Application.DoEvents();
+                            trace_slow("DoEvents", __trace6);
+                        }
                     }
                 
                     // Streaming start
@@ -1681,13 +1705,15 @@ namespace CppWinFormJoy
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
 
-                        long __trace7 = trace_start();
-                        FormJoy.myform1.lbl_IRStatus.Text = (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                        trace_slow("status label", __trace7);
-                        elapsed_time = (int)sw.ElapsedMilliseconds;
-                        long __trace8 = trace_start();
-                        Application.DoEvents();
-                        trace_slow("DoEvents", __trace8);
+                        if (ir_ui_due()) {
+                            long __trace7 = trace_start();
+                            FormJoy.myform1.lbl_IRStatus.Text = (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
+                            trace_slow("status label", __trace7);
+                            elapsed_time = (int)sw.ElapsedMilliseconds;
+                            long __trace8 = trace_start();
+                            Application.DoEvents();
+                            trace_slow("DoEvents", __trace8);
+                        }
 
                         previous_frag_no = 0;
                     }
