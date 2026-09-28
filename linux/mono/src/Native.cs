@@ -267,12 +267,37 @@ namespace CppWinFormJoy
                 length = OutputReportLength;
             }
 
+            // IR/NFC MCU reports (0x11) are sent in fast bursts while acknowledging IR
+            // fragments. On Windows each write blocks until it is sent, which spaces them out;
+            // hidraw only queues it, so they reach the controller back to back, and the Joy-Con
+            // drops output reports that arrive faster than its ~15ms report cycle. A dropped ACK
+            // stalls the transfer for 1 second. Keep them at least mcu_write_gap_ms apart.
+            if (data[0] == 0x11 && fake == null && mcu_write_gap_ms > 0) {
+                long wait = mcu_write_gap_ms - (write_clock.ElapsedMilliseconds - last_mcu_write_ms);
+                if (wait > 0)
+                    Thread.Sleep((int)wait);
+            }
+
             if (enable_traffic_dump)
                 traffic_log("W: ", data, length, false);
 
             if (fake != null)
                 return fake.Write(data, length);
-            return native_hid_write(dev, data, (UIntPtr)length);
+            int res = native_hid_write(dev, data, (UIntPtr)length);
+            if (data[0] == 0x11)
+                last_mcu_write_ms = write_clock.ElapsedMilliseconds;
+            return res;
+        }
+
+        static readonly System.Diagnostics.Stopwatch write_clock = System.Diagnostics.Stopwatch.StartNew();
+        static long last_mcu_write_ms = -1000;
+        // JCTOOL_MCU_WRITE_GAP_MS overrides the spacing (0 turns it off).
+        static readonly int mcu_write_gap_ms = ParseGap(Environment.GetEnvironmentVariable("JCTOOL_MCU_WRITE_GAP_MS"), 15);
+
+        static int ParseGap(string value, int fallback)
+        {
+            int ms;
+            return value != null && int.TryParse(value, out ms) && ms >= 0 ? ms : fallback;
         }
 
         public static int hid_read_timeout(IntPtr dev, u8* data, int length, int milliseconds)
