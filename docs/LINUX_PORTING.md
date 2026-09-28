@@ -99,7 +99,7 @@ A `/dev/hidrawN` node appears when it connects.
 
 ```sh
 sudo cp linux/udev/50-nintendo-switch-controllers.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw
 ```
 
 Reconnect the controller. `ls -l /dev/hidraw*` should now show an ACL `+` for

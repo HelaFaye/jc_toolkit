@@ -3,7 +3,7 @@
 #
 # Install:
 #   sudo cp 50-nintendo-switch-controllers.rules /etc/udev/rules.d/
-#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw
 # Then reconnect the controller.
 
 # USB (Pro Controller, Joy-Con charging grip)

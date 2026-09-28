@@ -116,7 +116,7 @@ Turn on (live button test), More… → Edit Calibration → Refresh All, IR Cam
 ```sh
 sudo cp ../udev/50-nintendo-switch-controllers.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
-sudo udevadm trigger
+sudo udevadm trigger --subsystem-match=hidraw   # only re-applies permissions to HID devices
 ```
 
 ## Step 6 — Pair the controller
