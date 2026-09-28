@@ -41,6 +41,25 @@ Others:
 
 Joy-Con Toolkit runs natively on Linux with Mono. See [linux/README.md](linux/README.md) for install, build and step-by-step testing instructions, and [docs/LINUX_PORTING.md](docs/LINUX_PORTING.md) for how the port was done.
 
+## Credits
+
+**Joy-Con Toolkit** by [CTCaer](https://github.com/CTCaer/jc_toolkit).
+
+Community changes merged into this version:
+
+* [linkoid](https://github.com/linkoid/jc_toolkit): `-l` command-line option to list HID device info, and pseudo-third-party controller support.
+* [fienestar](https://github.com/fienestar/jc_toolkit/tree/pr): controller priority selection (Any / Joy-Con (L) / Joy-Con (R) / Pro Controller) and the `handle_type` refactor.
+* [mas1850 (M.A. Schneider)](https://github.com/mas1850/jc_toolkit): Pastel Pink, Yellow, Purple and Green color presets, VS2022 toolset update, Pro Controller connection delay and README changelog.
+* [arpruss (Alexander Pruss)](https://github.com/arpruss/jc_toolkit): IR camera Pointing (DPD) and Clustering modes, and the IR image border flicker fix.
+
+Other code and research this project builds on:
+
+* [dekuNukem and contributors](https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering): Joy-Con protocol reverse engineering.
+* [shinyquagsire23](https://github.com/shinyquagsire23/HID-Joy-Con-Whispering): hidapi and USB usage on Linux, used as reference for the Linux port.
+* [Eric Betts (bettse)](https://github.com/bettse): NFC communication starters.
+* [Ryan Juckett (Hypersect)](http://blog.hypersect.com/interpreting-analog-sticks/): analog stick dead zone calculation.
+* [shuffle2](https://github.com/shuffle2/nxpad): Windows HID reference.
+
 ## References:
 
 **Official forum** and **Binary releases**: https://gbatemp.net/threads/tool-joy-con-toolkit-v1-0.478560/
