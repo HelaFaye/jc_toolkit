@@ -19,7 +19,7 @@ namespace CppWinFormJoy
         static readonly Dictionary<string, string> cache = new Dictionary<string, string>();
 
         static readonly string[] SansSubstitutes = { "Liberation Sans", "Arimo", "Noto Sans", "DejaVu Sans Condensed", "DejaVu Sans" };
-        static readonly string[] MonoSubstitutes = { "Liberation Mono", "Cousine", "DejaVu Sans Mono" };
+        static readonly string[] MonoSubstitutes = { "DejaVu Sans Mono", "Liberation Mono", "Noto Mono" };
 
         static bool IsInstalled(string family)
         {
@@ -43,9 +43,9 @@ namespace CppWinFormJoy
                 return mapped;
             mapped = family;
             if (!IsInstalled(family)) {
-                string[] candidates = family.StartsWith("Lucida Console", StringComparison.OrdinalIgnoreCase) ||
-                                      family.StartsWith("Consolas", StringComparison.OrdinalIgnoreCase)
-                    ? MonoSubstitutes : SansSubstitutes;
+                string[] candidates = family.StartsWith("Lucida Console", StringComparison.OrdinalIgnoreCase)
+                    ? MonoSubstitutes : family.StartsWith("Segoe UI", StringComparison.OrdinalIgnoreCase)
+                    ? SansSubstitutes : new string[0];
                 foreach (string c in candidates) {
                     if (IsInstalled(c)) {
                         mapped = c;
@@ -65,9 +65,10 @@ namespace CppWinFormJoy
             string family = MapFamily(font.OriginalFontName ?? font.FontFamily.Name);
             if (family == font.FontFamily.Name)
                 return font;
-            FontStyle style = font.Style;
-            // "Segoe UI Semibold" has no equivalent; keep it regular so text still fits.
-            return new Font(family, font.Size, style, font.Unit, font.GdiCharSet);
+            // Mono draws monospace text a little wider than GDI+ does with Lucida Console,
+            // which pushes the calibration readouts past their boxes. Shrink it slightly.
+            float size = Array.IndexOf(MonoSubstitutes, family) >= 0 ? font.Size * 0.92f : font.Size;
+            return new Font(family, size, font.Style, font.Unit, font.GdiCharSet);
         }
 
         public static Font Create(string family, float size, FontStyle style, GraphicsUnit unit, byte charset)
@@ -85,6 +86,20 @@ namespace CppWinFormJoy
             if (strip != null)
                 foreach (ToolStripItem item in strip.Items)
                     ApplyItem(item);
+        }
+
+        // Mono's multiline TextBox keeps the line wrapping it computed while its panel was
+        // detached from the form, which breaks lines at about half the box width. The app
+        // removes and re-adds its panels all the time, so re-flow them whenever that happens.
+        public static void RewrapTextBoxes(Control root)
+        {
+            var tb = root as TextBoxBase;
+            if (tb != null && tb.Multiline && tb.WordWrap) {
+                tb.WordWrap = false;
+                tb.WordWrap = true;
+            }
+            foreach (Control c in root.Controls)
+                RewrapTextBoxes(c);
         }
 
         static void ApplyItem(ToolStripItem item)

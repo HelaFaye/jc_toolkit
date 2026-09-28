@@ -88,6 +88,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
 
         InitializeComponent();
         Fonts.Apply(this);
+        this.ControlAdded += (sender, e) => Fonts.RewrapTextBoxes(e.Control);
 
         // Set static form, to allow calling functions from unmanaged code.
         myform1 = this;
@@ -1932,7 +1933,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             JCColorPicker = new jcColor.JoyConColorPicker(this.jcBodyColor, this.jcButtonsColor, gripsDialog);
 
         System.Drawing.Rectangle screenRectangle = RectangleToScreen(this.ClientRectangle);
-        int titleHeight = screenRectangle.Top - this.Top;
+        int titleHeight = Math.Max(screenRectangle.Top - this.Top, this.toolStrip1.Height);
 
         Fonts.Apply(JCColorPicker);
         JCColorPicker.TopLevel = false;
@@ -2071,7 +2072,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.AutoScaleDimensions = new System.Drawing.SizeF(96, 96);
         System.Drawing.Rectangle screenRectangle = RectangleToScreen(this.ClientRectangle);
         int titleHeight = screenRectangle.Top - this.Top;
-        
+        // The title bar height stands in for the tool strip's height here. Without a
+        // window manager (or with a thin title bar) that is too small, so use at least the strip.
+        titleHeight = Math.Max(titleHeight, this.toolStrip1.Height);
+
         this.grpBox_Color.Margin      = new System.Windows.Forms.Padding(0, 0, 14, titleHeight);
         this.grpBox_StickCal.Margin   = new System.Windows.Forms.Padding(0, 0, 0, titleHeight);
         this.grpBox_IRSettings.Margin = new System.Windows.Forms.Padding(0, 0, 0, titleHeight);
