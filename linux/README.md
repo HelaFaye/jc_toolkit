@@ -23,6 +23,9 @@ Linux-only changes, all kept small:
   `colors.xml` and `traffic_log.txt` are written next to `jctool.exe`.
 - The controller handle is closed before each reconnect check instead of leaking.
 - NFC reply lengths are bounds-checked.
+- The IR camera transfer runs on its own thread and hands frames to the window,
+  instead of pausing for window events after every fragment. On Wayland
+  (XWayland) those pauses can take a second each, which stalled the camera.
 
 Everything that doesn't need a controller has been tested in a Linux container
 with an emulated controller (`--selftest`, `--demo`). It has **not yet been

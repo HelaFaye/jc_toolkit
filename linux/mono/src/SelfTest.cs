@@ -188,6 +188,49 @@ namespace CppWinFormJoy
                             Check(img.Width == 240 && img.Height == 320, name + ": IRcamera.png is 240x320 (rotated like on Windows)");
                         File.Delete("IRcamera.png");
                     }
+
+                    // On XWayland, window event processing can block for about a second at a
+                    // time. Simulate that: the capture must still finish at full speed.
+                    fake.ir_fragment_delay_ms = 5; // ~2.6s per capture, like hardware
+                    var stall = new Timer { Interval = 20 };
+                    stall.Tick += (o, e) => System.Threading.Thread.Sleep(1000);
+                    stall.Start();
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    ir_res = form.CaptureIR();
+                    watch.Stop();
+                    stall.Stop();
+                    fake.ir_fragment_delay_ms = 0;
+                    Check(ir_res == 0 && File.Exists("IRcamera.png") && watch.ElapsedMilliseconds < 8000,
+                        name + ": IR capture finishes while the window is stalling (" + watch.ElapsedMilliseconds + "ms)");
+                    File.Delete("IRcamera.png");
+
+                    // Stream, apply a live config change while streaming, then Stop.
+                    int writes_before = 0, writes_after = 0, write_thread = 0, step = 0;
+                    var clicks = new Timer { Interval = 300 };
+                    clicks.Tick += (o, e) => {
+                        clicks.Stop();
+                        if (++step == 1) {
+                            writes_before = fake.ir_register_writes;
+                            form.ClickIRConfigLive();
+                            writes_after = fake.ir_register_writes;
+                            write_thread = fake.ir_register_write_thread;
+                            clicks.Start();
+                        }
+                        else {
+                            form.ClickIRStream(); // Stop
+                        }
+                    };
+                    fake.ir_fragment_delay_ms = 1;
+                    clicks.Start();
+                    watch.Restart();
+                    form.ClickIRStream();
+                    watch.Stop();
+                    clicks.Stop();
+                    fake.ir_fragment_delay_ms = 0;
+                    Check(step == 2 && writes_after > writes_before && write_thread != System.Threading.Thread.CurrentThread.ManagedThreadId
+                        && watch.ElapsedMilliseconds < 5000 && form.lbl_IRStatus.Text == "Status: Standby",
+                        name + ": IR stream, live config (sent by the IR thread) and Stop (" + watch.ElapsedMilliseconds + "ms)");
+                    File.Delete("IRcamera.png");
                 }
 
                 // Debug: custom command (subcmd 0x02 device info) and its reply dump

@@ -63,6 +63,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal Image PreviewImage { get { return this.pictureBoxPreview.Image; } }
     internal void RefreshPreview() { update_colors_from_spi(false); }
     internal int CaptureIR() { enable_IRVideoPhoto = false; return prepareSendIRConfig(true); }
+    internal void ClickIRStream() { btn_getVideo_Click(null, EventArgs.Empty); }
+    internal void ClickIRConfigLive() { btn_IRConfigLive_Click(null, EventArgs.Empty); }
 
     protected override void Dispose(bool disposing)
     {
@@ -2285,7 +2287,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         // Initialize camera
         if (startNewConfig) {
             // Configure the IR camera and take a photo or stream.
-            res = ir_sensor(ref ir_new_config);
+            // Linux: on its own thread, so UI stalls (XWayland) can't hold up the transfer.
+            ir_exposure_value = (int)this.numeric_IRExposure.Value;
+            ir_image_config cfg = ir_new_config;
+            res = ir_run_worker(() => ir_sensor(ref cfg));
 
             // Get error
             switch (res) {
@@ -2325,13 +2330,14 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         // Change camera configuration
         else {
             ir_new_config.ir_custom_register = (u32)(((u16)this.numeric_IRCustomRegAddr.Value) | ((u8)this.numeric_IRCustomRegVal.Value << 16));
-            res = ir_sensor_config_live(ref ir_new_config);
+            ir_image_config cfg = ir_new_config;
+            res = ir_run_on_device(() => ir_sensor_config_live(ref cfg));
         }
 
         return res;
     }
     
-    public void setIRPictureWindow(u8* buf_image, bool ir_video_photo) {
+    public void setIRPictureWindow(u8* buf_image, bool ir_video_photo, bool? save = null) {
         Bitmap MyImage = new Bitmap(ir_image_width, ir_image_height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
         int buf_pos = 0;
 
@@ -2378,7 +2384,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         Image rotatedImage = (Image)(MyImage);
         rotatedImage.RotateFlip(RotateFlipType.Rotate90FlipNone);
 
-        if (!enable_IRVideoPhoto)
+        if (save ?? !enable_IRVideoPhoto)
             rotatedImage.Save("IRcamera.png", System.Drawing.Imaging.ImageFormat.Png);
 
         Image resizedImage = new Bitmap(240, 320);

@@ -137,7 +137,7 @@ namespace CppWinFormJoy
         public static int handle_type;
 
         public static bool enable_button_test;
-        public static bool enable_IRVideoPhoto;
+        public static volatile bool enable_IRVideoPhoto; // volatile: read by the IR worker thread
         public static bool enable_IRAutoExposure;
         public static bool enable_NFCScanning;
         public static bool cancel_spi_dump;

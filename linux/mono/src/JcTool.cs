@@ -1342,7 +1342,7 @@ namespace CppWinFormJoy
             int res;
             u8* buf = stackalloc u8[49];
             u16 new_exposure = 0;
-            int old_exposure = (u16)FormJoy.myform1.numeric_IRExposure.Value;
+            int old_exposure = ir_exposure_value; // numeric_IRExposure.Value, read before the capture started
 
             // Calculate new exposure;
             if (white_pixels_percent == 0)
@@ -1351,7 +1351,8 @@ namespace CppWinFormJoy
                 old_exposure -= (white_pixels_percent / 4) * 20;
 
             old_exposure = CLAMP(old_exposure, 0, 600);
-            FormJoy.myform1.numeric_IRExposure.Value = old_exposure;
+            ir_exposure_value = old_exposure;
+            ir_show_exposure(old_exposure);
             new_exposure = (u16)(old_exposure * 31200 / 1000);
 
             memset(buf, 0, 49);
@@ -1414,19 +1415,166 @@ namespace CppWinFormJoy
             vline(buffer, cx, y0, y1, brightness);
         }
 
-        // The Windows code refreshed the IR status text and ran DoEvents() after every fragment
-        // (up to 512 times per capture). Under Mono, especially on XWayland, some of those calls
-        // stall for about a second while the Joy-Con waits, so refresh at most every 100ms.
-        // Finished frames are always drawn.
-        static readonly System.Diagnostics.Stopwatch ir_ui_clock = System.Diagnostics.Stopwatch.StartNew();
-        static long ir_ui_last = -1000;
+        // The Windows code ran the IR transfer on the UI thread and called DoEvents() after every
+        // fragment (up to 512 per capture). Under Mono on XWayland DoEvents() often blocks for about
+        // a second, while the Joy-Con waits for the fragment ACK, so frames never finished.
+        // On Linux the transfer runs on its own thread (ir_worker) and the status text, stats and
+        // frames are handed to the UI thread. Only the newest of each is kept, so a stalled UI
+        // never slows the transfer down.
+        public static volatile System.Threading.Thread ir_worker;
+        static readonly object ir_ui_lock = new object();
+        static string ir_pending_status;
+        static string ir_pending_help;
+        static byte[] ir_pending_frame;
+        static bool ir_pending_frame_save;
+        static int ir_pending_exposure = -1;
+        static bool ir_ui_posted;
+        public static int ir_exposure_value;
+        static Func<int> ir_pending_action;
+        static int ir_pending_action_res;
+        static volatile bool ir_pending_action_done;
 
-        static bool ir_ui_due() {
-            long now = ir_ui_clock.ElapsedMilliseconds;
-            if (now - ir_ui_last < 100)
-                return false;
-            ir_ui_last = now;
-            return true;
+        static bool on_ir_worker() {
+            return ir_worker != null && System.Threading.Thread.CurrentThread == ir_worker;
+        }
+
+        // Caller holds ir_ui_lock.
+        static void ir_ui_post() {
+            if (ir_ui_posted)
+                return;
+            ir_ui_posted = true;
+            try {
+                FormJoy.myform1.BeginInvoke((Action)ir_ui_flush);
+            }
+            catch (Exception) {
+                ir_ui_posted = false; // Window closed
+            }
+        }
+
+        // Applies the newest pending UI updates. Runs on the UI thread.
+        public static void ir_ui_flush() {
+            string status, help;
+            byte[] frame;
+            bool save;
+            int exposure;
+            lock (ir_ui_lock) {
+                status = ir_pending_status;     ir_pending_status = null;
+                help = ir_pending_help;         ir_pending_help = null;
+                frame = ir_pending_frame;       ir_pending_frame = null;
+                save = ir_pending_frame_save;
+                exposure = ir_pending_exposure; ir_pending_exposure = -1;
+                ir_ui_posted = false;
+            }
+            if (FormJoy.myform1 == null || FormJoy.myform1.IsDisposed)
+                return;
+            if (exposure >= 0)
+                FormJoy.myform1.numeric_IRExposure.Value = exposure;
+            if (frame != null) {
+                fixed (u8* p = frame)
+                    FormJoy.myform1.setIRPictureWindow(p, true, save);
+            }
+            if (status != null)
+                FormJoy.myform1.lbl_IRStatus.Text = status;
+            if (help != null)
+                FormJoy.myform1.lbl_IRHelp.Text = help;
+        }
+
+        static void ir_show_status(string text) {
+            if (!on_ir_worker()) {
+                FormJoy.myform1.lbl_IRStatus.Text = text;
+                return;
+            }
+            lock (ir_ui_lock) { ir_pending_status = text; ir_ui_post(); }
+        }
+
+        static void ir_show_help(string text) {
+            if (!on_ir_worker()) {
+                FormJoy.myform1.lbl_IRHelp.Text = text;
+                return;
+            }
+            lock (ir_ui_lock) { ir_pending_help = text; ir_ui_post(); }
+        }
+
+        static void ir_show_frame(u8* buf_image) {
+            if (!on_ir_worker()) {
+                FormJoy.myform1.setIRPictureWindow(buf_image, true);
+                return;
+            }
+            int size = 320 * 240; // The largest frame; smaller resolutions use the start of it
+            byte[] frame = new byte[size];
+            System.Runtime.InteropServices.Marshal.Copy((IntPtr)buf_image, frame, 0, size);
+            lock (ir_ui_lock) {
+                ir_pending_frame = frame;
+                ir_pending_frame_save = !enable_IRVideoPhoto;
+                ir_ui_post();
+            }
+        }
+
+        static void ir_show_exposure(int exposure) {
+            if (!on_ir_worker()) {
+                FormJoy.myform1.numeric_IRExposure.Value = exposure;
+                return;
+            }
+            lock (ir_ui_lock) { ir_pending_exposure = exposure; ir_ui_post(); }
+        }
+
+        // Runs where the Windows code ran DoEvents(): on the worker, it runs a device command the
+        // UI asked for (e.g. "Apply" live config while streaming), so it goes out between
+        // fragments exactly like it did from inside DoEvents() on Windows.
+        static void ir_pump() {
+            if (!on_ir_worker()) {
+                Application.DoEvents();
+                return;
+            }
+            Func<int> action;
+            lock (ir_ui_lock) { action = ir_pending_action; ir_pending_action = null; }
+            if (action != null) {
+                ir_pending_action_res = action();
+                ir_pending_action_done = true;
+            }
+        }
+
+        // Runs a device command on the IR worker if one is active (so only one thread talks to
+        // the controller), otherwise directly. Called from the UI thread; keeps the UI alive.
+        public static int ir_run_on_device(Func<int> action) {
+            System.Threading.Thread worker = ir_worker;
+            if (worker == null || on_ir_worker())
+                return action();
+            ir_pending_action_done = false;
+            lock (ir_ui_lock) { ir_pending_action = action; }
+            while (!ir_pending_action_done) {
+                if (!worker.IsAlive) {
+                    lock (ir_ui_lock) {
+                        if (ir_pending_action == action) {
+                            ir_pending_action = null;
+                            return action();
+                        }
+                    }
+                }
+                Application.DoEvents();
+                System.Threading.Thread.Sleep(5);
+            }
+            return ir_pending_action_res;
+        }
+
+        // Runs func (ir_sensor) on the IR worker thread and keeps the UI responsive until it ends.
+        public static int ir_run_worker(Func<int> func) {
+            int res = 0;
+            Exception error = null;
+            var t = new System.Threading.Thread(() => {
+                try { res = func(); }
+                catch (Exception ex) { error = ex; }
+            });
+            t.IsBackground = true;
+            ir_worker = t;
+            t.Start();
+            while (!t.Join(10))
+                Application.DoEvents();
+            ir_worker = null;
+            ir_ui_flush();
+            if (error != null)
+                throw new Exception("IR camera thread failed", error);
+            return res;
         }
 
         public static int get_raw_ir_image(u8 mode, u8 show_status) {
@@ -1477,8 +1625,8 @@ namespace CppWinFormJoy
                 //Check if new packet
                 if (buf_reply[0] == 0x31 && buf_reply[49] == 0x03 && buf_reply[51] == mode) {
                     got_frag_no = buf_reply[52];
+                    bool frame_done = false;
                     if (got_frag_no == (previous_frag_no + 1) % (ir_max_frag_no + 1) || mode != 0x07) {
-                        bool ui_now = false;
                         previous_frag_no = got_frag_no;
 
                         // ACK for fragment
@@ -1534,50 +1682,12 @@ namespace CppWinFormJoy
                             //debug
                            // printf("%02X Frag: Copy\n", got_frag_no);
 
-                            ui_now = ir_ui_due();
-                            if (ui_now) {
-                                long __trace1 = trace_start();
-                                FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                                trace_slow("status label", __trace1);
-                                elapsed_time = (int)sw.ElapsedMilliseconds;
-                            }
+                            ir_show_status(ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms");
+                            elapsed_time = (int)sw.ElapsedMilliseconds;
                         }
 
                         // Check if final fragment. Draw the frame.
-                        if (got_frag_no == ir_max_frag_no || mode != 0x07) {
-                            // Update Viewport
-                            elapsed_time2 = (int)sw.ElapsedMilliseconds - elapsed_time2;
-                            long __trace2 = trace_start();
-                            FormJoy.myform1.setIRPictureWindow(buf_image, true);
-                            trace_slow("draw IR frame", __trace2);
-
-                            //debug
-                            //printf("%02X Frag: Draw -------\n", got_frag_no);
-
-                            // Stats/IR header parsing
-                            // buf_reply[53]: Average Intensity. 0-255 scale.
-                            // buf_reply[54]: Unknown. Shows up only when EXFilter is enabled.
-                            // *(u16*)&buf_reply[55]: White pixels (pixels with 255 value). Max 65535. Uint16 constraints, even though max is 76800.
-                            // *(u16*)&buf_reply[57]: Pixels with ambient noise from external light sources (sun, lighter, IR remotes, etc). Cleaned by External Light Filter.
-                            noise_level = (float)(*(u16*)&buf_reply[57]) / ((float)(*(u16*)&buf_reply[55]) + 1.0f);
-                            white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
-                            avg_intensity_percent = (int)((buf_reply[53] * 100) / 255);
-                            long __trace3 = trace_start();
-                            FormJoy.myform1.lbl_IRHelp.Text = String.Format("Amb Noise: {0:f2},  Int: {1:D}%,  FPS: {2:D} ({3:D}ms)\nEXFilter: {4:D},  White Px: {5:D}%,  EXF Int: {6:D}",
-                                noise_level, avg_intensity_percent, elapsed_time2 > 0 ? (int)(1000 / elapsed_time2) : 0, elapsed_time2, *(u16*)&buf_reply[57], white_pixels_percent, buf_reply[54]);
-                            trace_slow("stats label", __trace3);
-
-                            elapsed_time2 = (int)sw.ElapsedMilliseconds;
-
-                            if (initialization != 0)
-                                initialization--;
-                            ui_now = true;
-                        }
-                        if (ui_now || mode != 0x07) {
-                            long __trace4 = trace_start();
-                            Application.DoEvents();
-                            trace_slow("DoEvents", __trace4);
-                        }
+                        frame_done = got_frag_no == ir_max_frag_no || mode != 0x07;
                     }
                     // Repeat/Missed fragment
                     else if (got_frag_no != 0 || previous_frag_no != 0) {
@@ -1680,15 +1790,8 @@ namespace CppWinFormJoy
                         ir_status.Append(String.Format("{0,3:F0}", (float)got_frag_no / (float)(ir_max_frag_no + 1) * 100.0f));
                         ir_status.Append("% - ");
 
-                        if (ir_ui_due()) {
-                            long __trace5 = trace_start();
-                            FormJoy.myform1.lbl_IRStatus.Text = ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                            trace_slow("status label", __trace5);
-                            elapsed_time = (int)sw.ElapsedMilliseconds;
-                            long __trace6 = trace_start();
-                            Application.DoEvents();
-                            trace_slow("DoEvents", __trace6);
-                        }
+                        ir_show_status(ir_status.ToString() + (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms");
+                        elapsed_time = (int)sw.ElapsedMilliseconds;
                     }
                 
                     // Streaming start
@@ -1705,19 +1808,36 @@ namespace CppWinFormJoy
                         //debug
                         //printf("%02X Frag: 0 %02X\n", buf_reply[52], previous_frag_no);
 
-                        if (ir_ui_due()) {
-                            long __trace7 = trace_start();
-                            FormJoy.myform1.lbl_IRStatus.Text = (sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms";
-                            trace_slow("status label", __trace7);
-                            elapsed_time = (int)sw.ElapsedMilliseconds;
-                            long __trace8 = trace_start();
-                            Application.DoEvents();
-                            trace_slow("DoEvents", __trace8);
-                        }
+                        ir_show_status((sw.ElapsedMilliseconds - elapsed_time).ToString() + "ms");
+                        elapsed_time = (int)sw.ElapsedMilliseconds;
 
                         previous_frag_no = 0;
                     }
 
+                    if (frame_done) {
+                        // Update Viewport
+                        elapsed_time2 = (int)sw.ElapsedMilliseconds - elapsed_time2;
+                        ir_show_frame(buf_image);
+
+                        //debug
+                        //printf("%02X Frag: Draw -------\n", got_frag_no);
+
+                        // Stats/IR header parsing
+                        // buf_reply[53]: Average Intensity. 0-255 scale.
+                        // buf_reply[54]: Unknown. Shows up only when EXFilter is enabled.
+                        // *(u16*)&buf_reply[55]: White pixels (pixels with 255 value). Max 65535. Uint16 constraints, even though max is 76800.
+                        // *(u16*)&buf_reply[57]: Pixels with ambient noise from external light sources (sun, lighter, IR remotes, etc). Cleaned by External Light Filter.
+                        noise_level = (float)(*(u16*)&buf_reply[57]) / ((float)(*(u16*)&buf_reply[55]) + 1.0f);
+                        white_pixels_percent = (int)((*(u16*)&buf_reply[55] * 100) / max_pixels);
+                        avg_intensity_percent = (int)((buf_reply[53] * 100) / 255);
+                        ir_show_help(String.Format("Amb Noise: {0:f2},  Int: {1:D}%,  FPS: {2:D} ({3:D}ms)\nEXFilter: {4:D},  White Px: {5:D}%,  EXF Int: {6:D}",
+                            noise_level, avg_intensity_percent, elapsed_time2 > 0 ? (int)(1000 / elapsed_time2) : 0, elapsed_time2, *(u16*)&buf_reply[57], white_pixels_percent, buf_reply[54]));
+
+                        elapsed_time2 = (int)sw.ElapsedMilliseconds;
+
+                        if (initialization != 0)
+                            initialization--;
+                    }
                 }
                 // Empty IR report. Send Ack again. Otherwise, it fallbacks to high latency mode (30ms per data fragment)
                 else if (buf_reply[0] == 0x31) {
@@ -1742,6 +1862,7 @@ namespace CppWinFormJoy
                     buf[12] = 0x00;
                     buf[13] = 0x00;
                 }
+                ir_pump();
             }
         
             System.Runtime.InteropServices.Marshal.FreeHGlobal((IntPtr)buf_image);

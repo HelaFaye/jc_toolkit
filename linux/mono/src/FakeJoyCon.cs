@@ -36,6 +36,9 @@ namespace CppWinFormJoy
         byte ir_mode;
         byte ir_max_frag;
         public int ir_frames_sent;
+        public int ir_register_writes;
+        public int ir_register_write_thread;
+        public int ir_fragment_delay_ms; // > 0: pace IR fragments like real hardware
 
         public FakeJoyCon(int type)
         {
@@ -187,6 +190,8 @@ namespace CppWinFormJoy
                 r[15] = 0x0b;
             }
             else if (data[11] == 0x23 && data[12] == 0x04) {   // Write IR registers
+                ir_register_writes++;
+                ir_register_write_thread = Thread.CurrentThread.ManagedThreadId;
                 r[15] = 0x13;
                 r[16] = 0x00;
                 r[17] = (byte)(ir_mode == 0x04 ? 0x02 : ir_mode);
@@ -212,6 +217,8 @@ namespace CppWinFormJoy
                 if (ir_mode == 0x07)
                     for (int i = 0; i < 300; i++)
                         r[59 + i] = (byte)(((frag * 300 + i) * 255 / ((ir_max_frag + 1) * 300)) ^ ((i % 20) < 2 ? 0xFF : 0));
+                if (ir_fragment_delay_ms > 0)
+                    Thread.Sleep(ir_fragment_delay_ms);
                 replies.Enqueue(r);
                 ir_frames_sent++;
             }
