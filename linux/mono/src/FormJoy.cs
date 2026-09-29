@@ -185,42 +185,70 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.toolStripLabel_link.Text      = "Link idle";
         this.toolStripLabel_link.ToolTipText = "Link health, over the last second (Linux)";
         this.toolStrip1.Items.Add(this.toolStripLabel_link);
-        // Linux: calibration in use, at the right of the menu bar (the status bar is full).
-        // Click: open the calibration editor with the controller's values.
-        this.toolStripLabel_cal = new ToolStripMenuItem();
-        this.toolStripLabel_cal.Alignment = ToolStripItemAlignment.Right;
-        this.toolStripLabel_cal.Font      = this.menuToolStripMenuItem.Font;
-        this.toolStripLabel_cal.ForeColor = System.Drawing.Color.FromArgb(251, 251, 251);
-        this.toolStripLabel_cal.Name      = "toolStripLabel_cal";
-        this.toolStripLabel_cal.Text      = "";
-        this.toolStripLabel_cal.Click    += (sender, e) => {
-            if (option_is_on != 7)
-                editCalibrationToolStripMenuItem_Click(sender, e);
-            btn_refreshUserCal_Click(sender, e);
-        };
-        this.menuStrip1.Items.Add(this.toolStripLabel_cal);
+        // Linux: calibration in use, as a third row of the info section (the rows are moved
+        // closer together to make room). Click: open the Calibration screen.
+        this.label_sn.Top = this.textBoxSN.Top = this.label_fw.Top = this.textBoxFW.Top = 34;
+        this.label_mac.Top = this.textBoxMAC.Top = this.label_dev.Top = this.textBoxDev.Top = 64;
+        this.label_cal = new Label();
+        this.label_cal.Font      = this.label_sn.Font;
+        this.label_cal.ForeColor = this.label_sn.ForeColor;
+        this.label_cal.Location  = new System.Drawing.Point(10, 94);
+        this.label_cal.Size      = new System.Drawing.Size(100, 20);
+        this.label_cal.Text      = "Calibration:";
+        this.lbl_calStatus = new Label();
+        this.lbl_calStatus.Font      = this.textBoxSN.Font;
+        this.lbl_calStatus.ForeColor = this.textBoxSN.ForeColor;
+        this.lbl_calStatus.Location  = new System.Drawing.Point(110, 94);
+        this.lbl_calStatus.Size      = new System.Drawing.Size(250, 20);
+        this.lbl_calStatus.Text      = "";
+        this.lbl_calStatus.Cursor    = Cursors.Hand;
+        this.lbl_calStatus.Click    += (sender, e) => open_calibration();
+        this.link_calibrate = new LinkLabel();
+        this.link_calibrate.Font      = new System.Drawing.Font("Segoe UI", 9.75F);
+        this.link_calibrate.LinkColor = this.link_calibrate.ActiveLinkColor = System.Drawing.Color.FromArgb(255, 188, 0);
+        this.link_calibrate.Location  = new System.Drawing.Point(375, 95);
+        this.link_calibrate.Size      = new System.Drawing.Size(92, 20);
+        this.link_calibrate.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
+        this.link_calibrate.Text      = "Calibrate..";
+        this.link_calibrate.LinkClicked += (sender, e) => open_calibration();
+        this.Controls.AddRange(new Control[] { this.label_cal, this.lbl_calStatus, this.link_calibrate });
 
-        // Linux: stick calibration wizard, one button per stick box (the label is shortened to make room).
-        foreach (bool left in new[] { true, false }) {
-            GroupBox box = left ? this.grpBox_leftStickUCal : this.grpBox_rightStickUCal;
-            Label help = left ? this.lbl_userCalMinCenterMax : this.lbl_userCalMinCenterMax2;
-            help.Text = "Min / Center / Max:";
-            help.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
-            help.Size = new System.Drawing.Size(110, 13);
-            var btn = new Button();
-            btn.Text      = "Calibrate..";
-            btn.Font      = new System.Drawing.Font("Segoe UI", 8.25F);
-            btn.FlatStyle = FlatStyle.Flat;
-            btn.BackColor = System.Drawing.Color.FromArgb(85, 85, 85);
-            btn.FlatAppearance.BorderColor = btn.BackColor;
-            btn.UseVisualStyleBackColor = false;
-            btn.ForeColor = System.Drawing.Color.FromArgb(9, 255, 206);
-            btn.Location  = new System.Drawing.Point(120, 14);
-            btn.Size      = new System.Drawing.Size(78, 27); // Mono draws the text only if a whole line fits
-            btn.Click    += (sender, e) => run_stick_cal_wizard(left);
-            box.Controls.Add(btn);
-            this.toolTip1.SetToolTip(btn, "Measure this stick's center and range (guided).\nFills in the values; click Write Cal to save them.");
+        // Linux: the Calibration screen gets tabs: guided Sticks and Motion calibration, and
+        // the original editor (Manual), moved into its own tab unchanged.
+        this.grpBox_editCalModel.Text = "Calibration";
+        var manual = new Panel();
+        manual.BackColor = this.grpBox_editCalModel.BackColor;
+        manual.Location  = new System.Drawing.Point(3, 56);
+        manual.Size      = new System.Drawing.Size(450, 366);
+        foreach (Control c in new Control[] { this.lbl_editStickDevHelp, this.btn_writeUserCal, this.btn_refreshUserCal,
+                                              this.grpBox_CalUserAcc, this.grpBox_StickDevParam,
+                                              this.grpBox_rightStickUCal, this.grpBox_leftStickUCal }) {
+            this.grpBox_editCalModel.Controls.Remove(c);
+            c.Location = new System.Drawing.Point(c.Left - 3, c.Top - 20);
+            manual.Controls.Add(c);
         }
+        this.stickCalPanel  = new StickCalPanel(this)  { Location = new System.Drawing.Point(3, 56) };
+        this.motionCalPanel = new MotionCalPanel(this) { Location = new System.Drawing.Point(3, 56) };
+        this.cal_pages = new Control[] { this.stickCalPanel, this.motionCalPanel, manual };
+        string[] tab_names = { "Sticks", "Motion", "Manual" };
+        this.cal_tabs = new Button[3];
+        for (int i = 0; i < 3; i++) {
+            int tab = i;
+            var b = CalUi.NewButton(tab_names[i], 6 + i * 104, 22, 100);
+            b.Click += (sender, e) => select_cal_tab(tab);
+            this.cal_tabs[i] = b;
+            this.grpBox_editCalModel.Controls.Add(b);
+            this.grpBox_editCalModel.Controls.Add(this.cal_pages[i]);
+        }
+        var tab_line = new Panel { BackColor = System.Drawing.Color.FromArgb(110, 110, 110),
+                                   Location = new System.Drawing.Point(6, 52), Size = new System.Drawing.Size(444, 2) };
+        this.grpBox_editCalModel.Controls.Add(tab_line);
+        this.grpBox_editCalModel.Size = new System.Drawing.Size(456, 428);
+        this.toolTip1.SetToolTip(this.cal_tabs[0], "Guided stick calibration: center and range");
+        this.toolTip1.SetToolTip(this.cal_tabs[1], "Guided motion (6-axis) calibration: gyro and accelerometer offsets");
+        this.toolTip1.SetToolTip(this.cal_tabs[2], "The original editor: user calibration values and stick device parameters");
+        select_cal_tab(0);
+
         if (check_connection_ok && handle_type != NOTHING)
             update_cal_status();
         link_take_stats();
@@ -315,10 +343,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     // Linux: which calibration the controller uses, in the status bar. User calibration
     // (SPI 0x8010 sticks, 0x8026 6-axis, magic B2 A1) overrides the factory one when present.
     internal void update_cal_status() {
-        if (this.toolStripLabel_cal == null)
-            return; // Called by full_refresh() before the constructor adds the label
+        if (this.lbl_calStatus == null)
+            return; // Called by full_refresh() before the constructor adds the row
         if (handle == IntPtr.Zero && fake == null) {
-            this.toolStripLabel_cal.Text = "";
+            this.lbl_calStatus.Text = "";
             return;
         }
         u8* user_cal = stackalloc u8[22];
@@ -330,19 +358,65 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         bool left  = handle_type != JOYCON_R && user_cal[0] == 0xB2 && user_cal[1] == 0xA1;
         bool right = handle_type != JOYCON_L && user_cal[11] == 0xB2 && user_cal[12] == 0xA1;
         bool imu   = sensor_cal[0] == 0xB2 && sensor_cal[1] == 0xA1;
-        bool any   = left || right || imu;
-        this.toolStripLabel_cal.Text = any ? "User calibration" : "Factory calibration";
-        this.toolStripLabel_cal.ForeColor = any ? System.Drawing.Color.FromArgb(0, 255, 234) : link_ok;
-        string tip = "Calibration in use (click to edit):\n";
+        var parts = new System.Collections.Generic.List<string>();
+        if (left)
+            parts.Add(handle_type == PROCON ? "L stick" : "stick");
+        if (right)
+            parts.Add(handle_type == PROCON ? "R stick" : "stick");
+        if (imu)
+            parts.Add("motion");
+        this.lbl_calStatus.Text = parts.Count == 0 ? "Factory" : "User (" + string.Join(", ", parts) + ")";
+        string tip = "Calibration in use (a user calibration overrides the factory one):\n";
         if (handle_type != JOYCON_R)
             tip += "  " + (handle_type == PROCON ? "Left stick" : "Stick") + ": " + (left ? "user" : "factory") + "\n";
         if (handle_type != JOYCON_L)
             tip += "  " + (handle_type == PROCON ? "Right stick" : "Stick") + ": " + (right ? "user" : "factory") + "\n";
-        tip += "  6-axis sensor: " + (imu ? "user" : "factory");
-        this.toolStripLabel_cal.ToolTipText = tip;
+        tip += "  Motion (6-axis): " + (imu ? "user" : "factory") + "\nClick to calibrate.";
+        this.toolTip1.SetToolTip(this.lbl_calStatus, tip);
     }
 
-    internal string CalText { get { return this.toolStripLabel_cal.Text; } }
+    internal string CalText { get { return this.lbl_calStatus.Text; } }
+
+    private Label label_cal, lbl_calStatus;
+    private LinkLabel link_calibrate;
+    private StickCalPanel stickCalPanel;
+    private MotionCalPanel motionCalPanel;
+    private Control[] cal_pages;
+    private Button[] cal_tabs;
+    private int cal_tab;
+
+    internal StickCalPanel StickCal { get { return stickCalPanel; } }
+    internal MotionCalPanel MotionCal { get { return motionCalPanel; } }
+
+    private void open_calibration() {
+        if (option_is_on != 7)
+            editCalibrationToolStripMenuItem_Click(null, EventArgs.Empty);
+    }
+
+    internal void select_cal_tab(int tab) {
+        stickCalPanel.Stop();
+        motionCalPanel.Stop();
+        cal_tab = tab;
+        for (int i = 0; i < cal_pages.Length; i++) {
+            cal_pages[i].Visible = i == tab;
+            cal_tabs[i].BackColor = i == tab ? System.Drawing.Color.FromArgb(110, 110, 110) : System.Drawing.Color.FromArgb(85, 85, 85);
+            cal_tabs[i].FlatAppearance.BorderColor = cal_tabs[i].BackColor;
+            cal_tabs[i].ForeColor = i == tab ? System.Drawing.Color.FromArgb(9, 255, 206) : System.Drawing.Color.FromArgb(200, 200, 200);
+        }
+        if (tab == 0)
+            stickCalPanel.Reset();
+        else if (tab == 1)
+            motionCalPanel.Reset();
+    }
+
+    // For the wizards
+    internal bool check_connection_lost() { return check_if_connected(); }
+
+    internal void calibration_written() {
+        update_cal_status();
+        if (this.btn_writeUserCal.Enabled)
+            btn_refreshUserCal_Click(null, EventArgs.Empty); // Keep the Manual tab in sync
+    }
 
     private void btn_writeColorsToSpi_Click(System.Object sender, System.EventArgs e) {
         if (check_if_connected())
@@ -667,7 +741,6 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     }
 
     private ToolStripLabel toolStripLabel_link;
-    private ToolStripMenuItem toolStripLabel_cal;
     private Timer timer_link;
     private int link_errors_total, link_timeouts_total;
     private long link_longest_gap_total;
@@ -952,6 +1025,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             this.Controls.Add(this.grpBox_editCalModel);
             this.lbl_editStickDevHelp.Size = new System.Drawing.Size(211, 46);
             this.grpBox_editCalModel.BringToFront();
+            select_cal_tab(0);
             option_is_on = 7;
             this.AutoScaleDimensions = new System.Drawing.SizeF(96, 96);
         }
@@ -960,6 +1034,10 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     }
 
     private void reset_window_option(bool reset_all) {
+        if (stickCalPanel != null) {
+            stickCalPanel.Stop();
+            motionCalPanel.Stop();
+        }
         if (!check_connection_ok) {
             this.toolStripBtn_refresh.Enabled    = false;
             this.toolStripBtn_Disconnect.Enabled = false;
@@ -2803,21 +2881,6 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     }
 
 
-    // Linux: guided stick calibration. Loads the current values first (Write Cal writes all of
-    // them), then fills in the measured stick.
-    private void run_stick_cal_wizard(bool left) {
-        if (check_if_connected())
-            return;
-        btn_refreshUserCal_Click(null, EventArgs.Empty);
-        using (var wizard = new StickCalWizard(left, this)) {
-            if (wizard.ShowDialog(this) != DialogResult.OK)
-                return;
-            apply_stick_cal(left, wizard.Result);
-        }
-        MessageBox.Show("The measured values were filled in.\n\nClick Write Cal to save them to the controller.",
-            "Stick calibration", MessageBoxButtons.OK, MessageBoxIcon.Information);
-    }
-
     internal void RefreshUserCal() { btn_refreshUserCal_Click(null, EventArgs.Empty); }
     internal int[] UserCalFields(bool left) {
         NumericUpDown[] f = left
@@ -2828,7 +2891,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         return Array.ConvertAll(f, n => (int)n.Value);
     }
 
-    // r: min, center, max for X then Y (raw)
+    // r: min, center, max for X then Y (raw); for the self-test of the Manual tab
     internal void apply_stick_cal(bool left, int[] r) {
         NumericUpDown[] f = left
             ? new[] { numeric_leftUserCal_x_minus, numeric_leftUserCal_x_center, numeric_leftUserCal_x_plus,

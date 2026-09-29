@@ -120,7 +120,8 @@ namespace CppWinFormJoy
             replies.Enqueue(r);
         }
 
-        public volatile int[] stick_raw;   // Raw 12-bit X, Y for both sticks in input reports (null: centered)
+        public volatile int[] stick_raw;
+        public volatile short[] imu_raw;   // Raw 6-axis values in input reports (null: a test pattern)   // Raw 12-bit X, Y for both sticks in input reports (null: centered)
         readonly System.Diagnostics.Stopwatch report_clock = System.Diagnostics.Stopwatch.StartNew();
         long last_report_ms;
 
@@ -346,6 +347,13 @@ namespace CppWinFormJoy
                 r[3] = (byte)((tick++ / 20) % 2 == 0 ? 0x08 : 0x00);   // blink the A button
                 for (int i = 13; i < 49; i++)
                     r[i] = (byte)(i * 7 + tick);
+                short[] imu = imu_raw;
+                if (imu != null)   // 3 samples of acc X, Y, Z, gyro X, Y, Z
+                    for (int sample = 0; sample < 3; sample++)
+                        for (int i = 0; i < 6; i++) {
+                            r[13 + sample * 12 + i * 2]     = (byte)(imu[i] & 0xFF);
+                            r[13 + sample * 12 + i * 2 + 1] = (byte)((imu[i] >> 8) & 0xFF);
+                        }
             }
             else {
                 if (milliseconds > 0)

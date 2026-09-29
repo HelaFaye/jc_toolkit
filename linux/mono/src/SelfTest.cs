@@ -168,51 +168,78 @@ namespace CppWinFormJoy
                 form.RefreshPreview();
                 Check(form.PreviewImage != null, name + " window: preview can be redrawn repeatedly");
 
-                // Calibration: status in the menu bar, guided stick calibration, write and read back.
-                Check(form.CalText == "Factory calibration", name + ": calibration status shown (" + form.CalText + ")");
+                // Calibration: status in the info section, guided stick and motion calibration
+                // (Calibration screen tabs), and the Manual tab reading what they wrote.
+                Check(form.CalText == "Factory", name + ": calibration status shown (" + form.CalText + ")");
                 bool left_stick = type != Jc.JOYCON_R;
-                int[] cal = null;
-                using (var wizard = new StickCalWizard(left_stick, form)) {
-                    fake.stick_raw = new[] { 2000, 2100 };
-                    wizard.Show();
+                Func<Func<bool>, int, bool> pump_until = (done, ms) => {
                     var clock = System.Diagnostics.Stopwatch.StartNew();
-                    while (!wizard.NextEnabled && clock.ElapsedMilliseconds < 3000) {
+                    while (!done() && clock.ElapsedMilliseconds < ms) {
                         Application.DoEvents();
-                        System.Threading.Thread.Sleep(5);
+                        System.Threading.Thread.Sleep(2);
                     }
-                    bool center_ok = wizard.NextEnabled;
-                    wizard.Next();
-                    // Three turns along the edge: X 800-3200, Y 900-3300
-                    for (int a = 0; a <= 3 * 360; a += 5) {
-                        double r = a * Math.PI / 180;
-                        fake.stick_raw = new[] { 2000 + (int)Math.Round(1200 * Math.Cos(r)), 2100 + (int)Math.Round(1200 * Math.Sin(r)) };
-                        var step_clock = System.Diagnostics.Stopwatch.StartNew();
-                        while (step_clock.ElapsedMilliseconds < 20) {
-                            Application.DoEvents();
-                            System.Threading.Thread.Sleep(2);
-                        }
-                    }
-                    bool rotate_ok = wizard.NextEnabled;
-                    wizard.Next();
-                    cal = wizard.Result;
-                    fake.stick_raw = null;
-                    Check(center_ok && rotate_ok && cal != null && Math.Abs(cal[0] - 800) <= 8 && cal[1] == 2000 && Math.Abs(cal[2] - 3200) <= 8
-                        && Math.Abs(cal[3] - 900) <= 8 && cal[4] == 2100 && Math.Abs(cal[5] - 3300) <= 8,
-                        name + ": stick calibration wizard measures center and range (" + (cal == null ? "none" : string.Join(",", cal)) + ")");
+                    return done();
+                };
+                var sticks = form.StickCal;
+                form.select_cal_tab(0);
+                fake.stick_raw = new[] { 2000, 2100 };
+                sticks.Start();
+                bool centered = pump_until(() => sticks.Rotating, 3000);
+                // Three turns along the edge: X 800-3200, Y 900-3300
+                for (int a = 0; a <= 3 * 360; a += 5) {
+                    double r = a * Math.PI / 180;
+                    fake.stick_raw = new[] { 2000 + (int)Math.Round(1200 * Math.Cos(r)), 2100 + (int)Math.Round(1200 * Math.Sin(r)) };
+                    var step_clock = System.Diagnostics.Stopwatch.StartNew();
+                    pump_until(() => step_clock.ElapsedMilliseconds >= 20, 100);
                 }
+                bool can_finish = sticks.CanFinish;
+                sticks.Finish();
+                int[] cal = sticks.Result;
+                fake.stick_raw = null;
+                Check(centered && can_finish && cal != null && Math.Abs(cal[0] - 800) <= 8 && cal[1] == 2000 && Math.Abs(cal[2] - 3200) <= 8
+                    && Math.Abs(cal[3] - 900) <= 8 && cal[4] == 2100 && Math.Abs(cal[5] - 3300) <= 8,
+                    name + ": guided stick calibration measures center and range (" + (cal == null ? "none" : string.Join(",", cal)) + ")");
                 if (cal != null) {
-                    form.RefreshUserCal();
-                    form.apply_stick_cal(left_stick, cal);
-                    int wres = form.write_user_cal_fields();
                     int magic = left_stick ? 0x8010 : 0x801B;
-                    Check(wres == 0 && fake.spi[magic] == 0xB2 && fake.spi[magic + 1] == 0xA1 && form.CalText == "User calibration",
-                        name + ": user stick calibration written, status shows it");
-                    form.apply_stick_cal(left_stick, new[] { 0, 0, 0, 0, 0, 0 });
+                    int other = left_stick ? 0x801B : 0x8010;
+                    byte other_before = fake.spi[other];
+                    int sres = sticks.Save(false);
+                    Check(sres == 0 && fake.spi[magic] == 0xB2 && fake.spi[magic + 1] == 0xA1 && fake.spi[other] == other_before
+                        && form.CalText == (type == Jc.PROCON ? "User (L stick)" : "User (stick)"),
+                        name + ": stick calibration saved (other stick untouched), status: " + form.CalText);
                     form.RefreshUserCal();
                     int[] back = form.UserCalFields(left_stick);
                     Check(string.Join(",", back) == string.Join(",", cal),
-                        name + ": user stick calibration reads back as written (" + string.Join(",", back) + ")");
+                        name + ": Manual tab reads the saved stick calibration (" + string.Join(",", back) + ")");
                 }
+
+                var motion = form.MotionCal;
+                form.select_cal_tab(1);
+                fake.imu_raw = new short[] { 60, -150, 4096 + 341, 900, -900, 900 }; // Moving: large gyro
+                motion.Start();
+                var flip = new Timer { Interval = 30 };
+                bool flip_state = false;
+                flip.Tick += (o, e) => { flip_state = !flip_state; fake.imu_raw = new short[] { 60, -150, 4096 + 341, (short)(flip_state ? 900 : -900), 0, 0 }; };
+                flip.Start();
+                bool measured_moving = pump_until(() => motion.Measured, 2500);
+                flip.Stop();
+                fake.imu_raw = new short[] { -45, -43, 4096 + 341, 25, -35, -36 };
+                bool measured = pump_until(() => motion.Measured, 5000);
+                fake.imu_raw = null;
+                int[] mres = motion.Result;
+                Check(!measured_moving && measured && mres != null && string.Join(",", mres) == "-45,-43,341,25,-35,-36",
+                    name + ": guided motion calibration waits for stillness, measures the offsets (" + (mres == null ? "none" : string.Join(",", mres)) + ")");
+                if (measured) {
+                    int wres = motion.Save(false);
+                    bool bytes_ok = fake.spi[0x8026] == 0xB2 && fake.spi[0x8027] == 0xA1
+                        && (short)(fake.spi[0x802C] | fake.spi[0x802D] << 8) == 341
+                        && (short)(fake.spi[0x8034] | fake.spi[0x8035] << 8) == 25;
+                    for (int i = 0; i < 6; i++)
+                        bytes_ok &= fake.spi[0x802E + i] == fake.spi[0x6026 + i] && fake.spi[0x803A + i] == fake.spi[0x6032 + i];
+                    Check(wres == 0 && bytes_ok && form.CalText.Contains("motion"),
+                        name + ": motion calibration saved with the factory sensitivities, status: " + form.CalText);
+                }
+                form.select_cal_tab(2);
 
                 string file = "selftest_spi_dump.bin";
                 Jc.cancel_spi_dump = false;

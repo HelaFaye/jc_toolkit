@@ -253,20 +253,22 @@ controller (no hardware needed).
 
 ## Calibration (Linux additions)
 
-**Status:** the right end of the menu bar shows `Factory calibration`, or `User calibration`
-when a user stick or 6-axis calibration overrides the factory one (hover for which). Click
-it to open the calibration editor with the controller's values. The CLI's device info (2)
-shows the same.
+**Status:** the info section's third row shows `Factory`, or `User (...)` with what a user
+calibration overrides (stick, motion). Hover for details; click it or **Calibrate..** to
+open the Calibration screen. The CLI's device info (2) shows the same.
 
-**Guided stick calibration:** More... > Edit Calibration, then **Calibrate..** in a stick box.
-1. Let go of the stick; Next is enabled once it rests still. Click it to take the center.
-2. Rotate the stick slowly along its edge, pushed all the way, until every direction is
-   covered (2-3 turns). Click Done.
+**Calibration screen** (More... > Edit Calibration), one tab per mode:
 
-The measured center and range fill the box's fields and turn its user calibration on.
-Nothing is written yet: check the values, then click **Write Cal** (it writes all the
-fields, which the wizard loads from the controller first). The CLI offers the same in
-menu 11 when you set a stick user calibration.
+| Tab | What it does |
+|---|---|
+| Sticks | Guided stick calibration (Pro Controller: pick the stick). Click Start, let go of the stick (the circle shrinks while it holds still), then rotate it slowly along its edge, pushed all the way, until the whole ring lights up. Finish, then Save. |
+| Motion | Guided motion (6-axis) calibration, for drift. Lay the controller flat and still, buttons up (the bubble shows the tilt), click Start and don't touch it for ~2 seconds (it starts over if it moves). Save writes the measured gyro and accelerometer offsets with the factory sensitivities. |
+| Manual | The original editor: user calibration values, stick device parameters, Refresh All / Write Cal. |
+
+The wizards read the controller only while measuring, and Save (after a confirmation)
+writes only what was measured: the other stick and the other calibration stay as they
+are. The CLI offers the guided stick calibration in menu 11 when you set a stick user
+calibration.
 
 ## Link health (status bar, Linux only)
 
