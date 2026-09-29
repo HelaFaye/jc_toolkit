@@ -399,6 +399,9 @@ IR_ERRORS = {1: "1ID31", 2: "2MCUON", 3: "3MCUONBUSY", 4: "4MCUMODESET", 5: "5MC
              7: "7IRSETBUSY", 8: "8IRCFG", 9: "9IRFCFG", 10: "10IRNOCFG"}
 NFC_ERRORS = {1: "1ID31", 2: "2MCUON", 3: "3MCUONBUSY", 4: "4MCUMODESET", 5: "5MCUSETBUSY", 6: "6NFCPOLL",
               7: "7NFCRECV", 8: "8NFCREAD"}
+NFC_HELP = {6: "The NFC reader didn't get ready. Scan again.",
+            7: "No tag detected. Hold it on the right stick, then scan again.",
+            8: "The tag couldn't be read. Keep it still on the right stick and scan again."}
 
 
 def ir_run(jc, settings, stream):

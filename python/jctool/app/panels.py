@@ -565,7 +565,7 @@ class NfcPanel(Panel):
         def done(res):
             self.btn.text = "Scan"
             if isinstance(res, int) and res > 0 and res in ops.NFC_ERRORS:
-                self.lbl_uid.text = "Error %s!" % ops.NFC_ERRORS[res]
+                self.lbl_uid.text = "Error %s: %s" % (ops.NFC_ERRORS[res], ops.NFC_HELP.get(res, "Scan again."))
         if self.run(work, done, long_running=True, name="the NFC scan"):
             self.btn.text = "Stop"
             self.dump.text = ""

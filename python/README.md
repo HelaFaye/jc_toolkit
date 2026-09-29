@@ -16,7 +16,7 @@ Everything the original and the Linux (Mono) build do:
 | Button test | Buttons, sticks (raw and calibrated) and 6-axis sensors live, with the calibration data |
 | HD Rumble | **Files**: .bnvib / .jcvib with the equalizer and loops, the two easter egg tunes. **MIDI**: a MIDI file or a MIDI device played on the rumble (two notes at once: one per band) |
 | IR Camera | Joy-Con (R): capture (saved as `IRcamera.png`), stream with live settings, every setting of the original, Quick capture |
-| NFC | Amiibo / NTAG scan and dump |
+| NFC | Amiibo / NTAG scan and dump; MIFARE tags: the UID (their contents can't be read) |
 | Debug | Custom commands and their replies, the HID device list, the traffic log |
 
 The info section shows the S/N, firmware, MAC, controller type and which calibration is

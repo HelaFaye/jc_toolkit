@@ -991,6 +991,7 @@ class JoyCon:
         ntag_pages = 0
         ntag_init_done = False
         last_poll_reply = bytearray(0x170)
+        detected = False
         while True:
             # Step 5: NFC status, wait until it's ready for a command
             ready = False
@@ -1022,6 +1023,8 @@ class JoyCon:
                 retries = 0
                 while True:
                     if not self.enable_nfc_scanning:
+                        if not detected:
+                            return 0          # Stopped before a tag was there: nothing to read
                         found = True          # Stop requested: go on to reading, like the original
                         break
                     n, b = self.read(0x170, 64)
@@ -1033,7 +1036,7 @@ class JoyCon:
                             uid = ":".join("%02X" % b[65 + i] for i in range(min(tag_uid_size, 10)))
                             self.ui.nfc_uid("UID:  %s\nType: %s" % (uid, "NTAG" if b[62] == 0x2 else "MIFARE"))
                             self.ui.poll()
-                            found = True
+                            found = detected = True
                             break
                         elif b[49] == 0x2A:
                             break
@@ -1047,6 +1050,13 @@ class JoyCon:
                 if error_reading > 100:
                     self.ui.nfc_tag("Tag lost!" if ntag_init_done else "No Tag detected!")
                     return 7
+            if detected and tag_type != 0x02:
+                # Only NTAG contents can be read (the original tried anyway, then failed
+                # with error 8): the UID is all there is
+                self.note("NFC: tag type %02X is not NTAG: UID only" % tag_type)
+                self.ui.nfc_tag("This is a MIFARE tag: its UID is above.\n"
+                                "Reading the contents of MIFARE tags isn't supported.")
+                return 0
             # Step 7: read the NTAG contents
             error_reading = 0
             restart = False

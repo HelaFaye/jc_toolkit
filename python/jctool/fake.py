@@ -32,7 +32,9 @@ class FakeJoyCon:
         self.imu_on = False
         self.timer = 0
         self.tick = 0
-        self.mcu_state = 0          # 0: off, 1: standby, 5: IR
+        self.mcu_state = 0          # 0: off, 1: standby, 4: NFC, 5: IR
+        self.nfc_tag = None         # (tag type byte, UID) on the NFC area: 0x02 NTAG, 0x04 MIFARE
+        self.nfc_reads = 0
         self.ir_mode = 0
         self.ir_max_frag = 0
         self.ir_frames_sent = 0
@@ -202,11 +204,30 @@ class FakeJoyCon:
             r[17] = 0x02 if self.ir_mode == 0x04 else self.ir_mode
         self.replies.append(r)
 
+    def _nfc_report(self, state):
+        r = self._mcu_report(0x2A)
+        r[50], r[51], r[55], r[56] = 0x00, 0x05, 0x31, state
+        if self.nfc_tag is not None and state in (0x09, 0x02, 0x04):
+            tag_type, uid = self.nfc_tag
+            r[60], r[61], r[62], r[63], r[64] = 0x01, 0x01, tag_type, 0x00, len(uid)
+            r[65:65 + len(uid)] = uid
+        return r
+
     def _mcu_write(self, d):
         if d[10] == 0x01:                       # MCU status
             r = self._mcu_report(0x01)
             r[56] = self.mcu_state
             self.replies.append(r)
+        elif d[10] == 0x02 and self.mcu_state == 4:   # NFC command (only tag detection)
+            if d[11] == 0x04:                   # Status: ready for a command
+                self.replies.append(self._nfc_report(0x00))
+            elif d[11] == 0x01:                 # Start polling: tag detected, or polling
+                self.replies.append(self._nfc_report(0x09 if self.nfc_tag is not None else 0x01))
+            elif d[11] == 0x06:                 # Read: this emulation has no tag contents
+                self.nfc_reads += 1
+                self.replies.append(self._nfc_report(0x02))
+            else:
+                self.replies.append(self._nfc_report(0x00))
         elif d[10] == 0x03 and d[11] == 0x00 and self.mcu_state == 5 and self.ir_mode != 0:
             mf = self.ir_max_frag
             frag = d[13] if d[12] == 0x01 else (0 if self.ir_frames_sent == 0 else (d[14] + 1) % (mf + 1))
