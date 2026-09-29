@@ -293,3 +293,6 @@ cli/*.o
 # Local development
 .vscode/
 build/
+__pycache__/
+*.pyc
+.pytest_cache/
