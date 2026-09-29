@@ -4,6 +4,9 @@ A native Linux build of CTCaer's Joy-Con Toolkit v5.2.0, including the merged
 community changes: controller priority selection, pseudo-third-party controllers,
 `-l` HID listing, pastel color presets, and IR Pointing/Cluster modes.
 
+There is also a cross-platform Python / Kivy version of the app (the same udev rule
+applies): see [../python/README.md](../python/README.md).
+
 It is a C# port that runs on Mono:
 
 | Part | Source | How it was ported |

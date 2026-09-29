@@ -6,6 +6,7 @@ import time
 from conftest import make, wait_until
 from jctool import calibration, midi
 from jctool.hidio import JOYCON_R, PROCON
+from jctool.tests_data import small_midi
 
 
 def feed_stick(wizard, fake, jc, positions):
@@ -102,18 +103,6 @@ def test_midi_encoding():
     assert midi.encode(0, 0, 0, 0) == midi.SILENCE
     assert midi.fold(midi.frequency(60), 400, 1252) == midi.frequency(72)
     assert midi.note_name(69) == "A4"
-
-
-def small_midi():
-    def chunk(body):
-        return b"MTrk" + len(body).to_bytes(4, "big") + bytes(body)
-    tempo = chunk([0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20, 0x81, 0x40, 0xFF, 0x51, 0x03, 0x0F, 0x42, 0x40,
-                   0x00, 0xFF, 0x2F, 0x00])
-    lead = chunk([0x00, 0xFF, 0x03, 0x04] + list(b"Lead") +
-                 [0x00, 0x90, 60, 100, 0x60, 0x80, 60, 0, 0x00, 0x90, 67, 90, 0x00, 72, 110,
-                  0x60, 0x80, 67, 0, 0x00, 72, 0, 0x00, 0x90, 64, 127, 0x60, 64, 0, 0x00, 0xFF, 0x2F, 0x00])
-    drums = chunk([0x00, 0x99, 42, 100, 0x30, 0x89, 42, 0, 0x00, 0xFF, 0x2F, 0x00])
-    return b"MThd" + (6).to_bytes(4, "big") + (1).to_bytes(2, "big") + (3).to_bytes(2, "big") + (96).to_bytes(2, "big") + tempo + lead + drums
 
 
 def test_midi_file_parsed():

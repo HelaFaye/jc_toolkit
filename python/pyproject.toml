@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jctool"
+version = "5.2.0"
+description = "Joy-Con Toolkit: Joy-Con and Pro Controller colors, backups, calibration, HD Rumble, IR camera, NFC (Kivy app)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = [
+    "kivy>=2.2",
+    "hidapi>=0.14",
+]
+
+[project.optional-dependencies]
+midi = ["mido>=1.3", "python-rtmidi>=1.5"]
+test = ["pytest"]
+
+[project.scripts]
+jctool = "jctool.app.main:main"
+
+[tool.setuptools]
+packages = ["jctool", "jctool.app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
