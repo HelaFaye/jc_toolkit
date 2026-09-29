@@ -250,6 +250,37 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.toolTip1.SetToolTip(this.cal_tabs[2], "The original editor: user calibration values and stick device parameters");
         select_cal_tab(0);
 
+        // Linux: the HD Rumble Player gets tabs: the original player (Files) and MIDI (a MIDI
+        // file or device played on the rumble).
+        var vib_files = new Panel();
+        vib_files.BackColor = this.grpBox_VibPlayer.BackColor;
+        vib_files.Location  = new System.Drawing.Point(3, 54);
+        vib_files.Size      = new System.Drawing.Size(214, 376);
+        foreach (Control c in new Control[] { this.groupBox_vib_info, this.groupBox_vib_eq, this.btn_vibPlay, this.btn_loadVib }) {
+            this.grpBox_VibPlayer.Controls.Remove(c);
+            c.Location = new System.Drawing.Point(c.Left - 3, c.Top - 22);
+            vib_files.Controls.Add(c);
+        }
+        this.midiPanel = new MidiPanel(this) { Location = new System.Drawing.Point(3, 54) };
+        this.vib_pages = new Control[] { vib_files, this.midiPanel };
+        this.vib_tabs = new Button[2];
+        string[] vib_tab_names = { "Files", "MIDI" };
+        for (int i = 0; i < 2; i++) {
+            int tab = i;
+            var b = CalUi.NewButton(vib_tab_names[i], 6 + i * 106, 20, 102);
+            b.Click += (sender, e) => select_vib_tab(tab);
+            this.vib_tabs[i] = b;
+            this.grpBox_VibPlayer.Controls.Add(b);
+            this.grpBox_VibPlayer.Controls.Add(this.vib_pages[i]);
+        }
+        this.grpBox_VibPlayer.Controls.Add(new Panel { BackColor = System.Drawing.Color.FromArgb(110, 110, 110),
+                                                       Location = new System.Drawing.Point(6, 50), Size = new System.Drawing.Size(208, 2) });
+        this.grpBox_VibPlayer.Size = new System.Drawing.Size(220, 436);
+        this.grpBox_VibPlayer.Margin = new System.Windows.Forms.Padding(0, 0, 14, 39); // The window grows to fit it
+        this.toolTip1.SetToolTip(this.vib_tabs[0], "Play HD Rumble files (.bnvib, .jcvib)");
+        this.toolTip1.SetToolTip(this.vib_tabs[1], "Play a MIDI file or a MIDI device (keyboard) on the rumble");
+        select_vib_tab(0);
+
         if (check_connection_ok && handle_type != NOTHING)
             update_cal_status();
         link_take_stats();
@@ -385,6 +416,21 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     private Control[] cal_pages;
     private Button[] cal_tabs;
     private int cal_tab;
+
+    private MidiPanel midiPanel;
+    private Control[] vib_pages;
+    private Button[] vib_tabs;
+    internal MidiPanel Midi { get { return midiPanel; } }
+
+    internal void select_vib_tab(int tab) {
+        midiPanel.Stop();
+        for (int i = 0; i < vib_pages.Length; i++) {
+            vib_pages[i].Visible = i == tab;
+            vib_tabs[i].BackColor = i == tab ? System.Drawing.Color.FromArgb(110, 110, 110) : System.Drawing.Color.FromArgb(85, 85, 85);
+            vib_tabs[i].FlatAppearance.BorderColor = vib_tabs[i].BackColor;
+            vib_tabs[i].ForeColor = i == tab ? System.Drawing.Color.FromArgb(9, 255, 206) : System.Drawing.Color.FromArgb(200, 200, 200);
+        }
+    }
 
     internal StickCalPanel StickCal { get { return stickCalPanel; } }
     internal MotionCalPanel MotionCal { get { return motionCalPanel; } }
@@ -1039,6 +1085,8 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
             stickCalPanel.Stop();
             motionCalPanel.Stop();
         }
+        if (midiPanel != null)
+            midiPanel.Stop();
         if (!check_connection_ok) {
             this.toolStripBtn_refresh.Enabled    = false;
             this.toolStripBtn_Disconnect.Enabled = false;

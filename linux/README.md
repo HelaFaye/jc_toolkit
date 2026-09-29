@@ -271,6 +271,24 @@ are. **Use factory** (Sticks: the chosen stick; Motion) erases that user calibra
 the controller goes back to its factory calibration. The CLI offers the guided stick calibration in menu 11 when you set a stick user
 calibration.
 
+## HD Rumble Player: MIDI (Linux addition)
+
+The HD Rumble Player has two tabs: **Files** (the original player) and **MIDI**, which
+plays music on the rumble, like [Musical-Joycons](https://github.com/sarossilli/MusicalJoycons)
+by sarossilli (the idea comes from it; this is a separate implementation).
+
+- **File:** Load MIDI.. (`.mid`), pick a part or "All parts (no drums)", Play / Stop.
+- **Device:** a MIDI keyboard or other MIDI hardware. Scan lists ALSA's raw MIDI devices
+  (`/dev/snd/midiC*D*`); pick one and a channel (or all), then Listen / Stop. The sustain
+  pedal works. Opening the device needs access to it (usually the `audio` group or your
+  desktop session). A software MIDI source (a DAW, a virtual keyboard) can reach it through
+  the `snd-virmidi` kernel module (`sudo modprobe snd-virmidi`): connect the source to a
+  "Virtual Raw MIDI" port (e.g. with `aconnect`) and pick that device here.
+
+HD Rumble has two bands, so two notes sound at once: the highest held note on the high band
+(octave-shifted into 400-1252 Hz) and, with "Lowest note on the low band", the lowest one on
+the low band (100-626 Hz). Velocity and Volume set the strength. The bars show each band's note.
+
 ## Link health (status bar, Linux only)
 
 Left of the temperature, updated every second from the app's own traffic (it doesn't

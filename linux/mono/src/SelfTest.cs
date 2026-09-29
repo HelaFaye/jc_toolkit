@@ -497,6 +497,96 @@ namespace CppWinFormJoy
                     File.Delete("IRcamera.png");
                 }
 
+                // HD Rumble Player, MIDI tab: encoding, a MIDI file, and live input (a FIFO standing in
+                // for a raw MIDI device).
+                {
+                    byte* enc = stackalloc byte[4];
+                    MidiRumble.Encode(440, 0.8f, 0, 0, enc);
+                    double a4 = MidiRumble.DecodeHighHz(enc);
+                    MidiRumble.Encode(0, 0, 0, 0, enc);
+                    Check(Math.Abs(a4 - 440) < 440 * 0.012 && enc[0] == 0x00 && enc[1] == 0x01 && enc[2] == 0x40 && enc[3] == 0x40,
+                        name + ": MIDI note to HD Rumble encoding (A4 -> " + a4.ToString("F1") + " Hz; silence 00 01 40 40)");
+
+                    // Format 1, 96 ticks per quarter. Track 0: tempo 120 BPM, then 60 BPM at beat 2.
+                    // Track 1 "Lead", channel 1: C4 (beat 0-1), G4 + C5 chord (beat 1-2), E4 (beat 2-3, at 60 BPM).
+                    // Track 2 channel 10 (drums): F#2 hi-hat at beat 0.
+                    var mid = new System.Collections.Generic.List<byte>();
+                    Action<string> ascii = t => mid.AddRange(System.Text.Encoding.ASCII.GetBytes(t));
+                    Action<int, int> be = (v, n) => { for (int i = n - 1; i >= 0; i--) mid.Add((byte)(v >> (8 * i))); };
+                    Action<byte[]> chunk = body => { ascii("MTrk"); be(body.Length, 4); mid.AddRange(body); };
+                    ascii("MThd"); be(6, 4); be(1, 2); be(3, 2); be(96, 2);
+                    chunk(new byte[] { 0x00, 0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20, 0x81, 0x40, 0xFF, 0x51, 0x03, 0x0F, 0x42, 0x40, 0x00, 0xFF, 0x2F, 0x00 });
+                    chunk(new byte[] { 0x00, 0xFF, 0x03, 0x04, (byte)'L', (byte)'e', (byte)'a', (byte)'d',
+                                       0x00, 0x90, 60, 100,  0x60, 0x80, 60, 0,  0x00, 0x90, 67, 90,  0x00, 72, 110,
+                                       0x60, 0x80, 67, 0,  0x00, 72, 0,  0x00, 0x90, 64, 127,  0x60, 64, 0,  0x00, 0xFF, 0x2F, 0x00 });
+                    chunk(new byte[] { 0x00, 0x99, 42, 100, 0x30, 0x89, 42, 0, 0x00, 0xFF, 0x2F, 0x00 });
+                    string mid_path = "selftest.mid";
+                    File.WriteAllBytes(mid_path, mid.ToArray());
+
+                    var midi = form.Midi;
+                    bool loaded = midi.Load(mid_path);
+                    var song = midi.Song;
+                    bool parsed = loaded && song.parts.Count == 2 && song.notes.Count == 5 && song.parts[0].name == "Lead"
+                        && song.parts[1].drums && Math.Abs(song.length - 2.0) < 0.001;   // 0.5 + 0.5 + 1.0 s
+                    Check(parsed, name + ": MIDI file parsed (" + (song == null ? "none" : song.parts.Count + " parts, " + song.notes.Count
+                        + " notes, " + song.length.ToString("F3") + " s") + ")");
+
+                    lock (fake.rumbles) fake.rumbles.Clear();
+                    midi.Play();
+                    bool finished = pump_until(() => !midi.Playing, 5000);
+                    var heard = new System.Collections.Generic.List<int>();
+                    byte[] final = null;
+                    lock (fake.rumbles)
+                        foreach (var rb in fake.rumbles) {
+                            final = rb;
+                            if (rb[0] == 0x00 && rb[1] == 0x01 && rb[2] == 0x40 && rb[3] == 0x40)
+                                continue;
+                            fixed (byte* pb = rb) {
+                                int hz = (int)Math.Round(MidiRumble.DecodeHighHz(pb));
+                                if (!heard.Contains(hz))
+                                    heard.Add(hz);
+                            }
+                        }
+                    // C4 261.6 -> 523 Hz, C5 523 (chord top), E4 329.6 -> 659; not the hi-hat (F#2 -> 740)
+                    Func<int, bool> has = hz => heard.Exists(x => Math.Abs(x - hz) <= hz * 0.012);
+                    Check(finished && has(523) && has(659) && !has(740) && final != null && final[1] == 0x01 && final[2] == 0x40,
+                        name + ": MIDI file plays on the rumble, drums skipped, silent at the end (" + string.Join(",", heard) + " Hz)");
+
+                    // Live: a FIFO as the MIDI device. A4 on, sustain on, A4 off (still sounding), sustain off.
+                    string fifo = Path.Combine(Path.GetTempPath(), "jctool-selftest-midi-" + System.Diagnostics.Process.GetCurrentProcess().Id);
+                    File.Delete(fifo);
+                    var mk = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("mkfifo", fifo) { UseShellExecute = false });
+                    mk.WaitForExit();
+                    bool listening = midi.Listen(fifo);
+                    Func<double> last_hz = () => {
+                        lock (fake.rumbles) {
+                            if (fake.rumbles.Count == 0) return -1;
+                            var rb = fake.rumbles[fake.rumbles.Count - 1];
+                            if (rb[0] == 0x00 && rb[1] == 0x01 && rb[2] == 0x40 && rb[3] == 0x40) return 0;
+                            fixed (byte* pb = rb) return MidiRumble.DecodeHighHz(pb);
+                        }
+                    };
+                    double on_hz = -1, held_hz = -1, off_hz = -1;
+                    using (var w = new FileStream(fifo, FileMode.Open, FileAccess.Write)) {
+                        Action<byte[]> send = bytes => { w.Write(bytes, 0, bytes.Length); w.Flush(); };
+                        send(new byte[] { 0x90, 69, 100 });
+                        pump_until(() => Math.Abs(last_hz() - 440) < 6, 1000);
+                        on_hz = last_hz();
+                        send(new byte[] { 0xB0, 64, 127, 0x80, 69, 0 });
+                        pump_until(() => false, 150);
+                        held_hz = last_hz();
+                        send(new byte[] { 0xB0, 64, 0 });
+                        pump_until(() => last_hz() == 0, 1000);
+                        off_hz = last_hz();
+                    }
+                    midi.Stop();
+                    File.Delete(fifo);
+                    File.Delete(mid_path);
+                    Check(listening && Math.Abs(on_hz - 440) < 6 && Math.Abs(held_hz - 440) < 6 && off_hz == 0 && !midi.Listening,
+                        name + ": MIDI input plays live, sustain pedal holds a note (" + on_hz.ToString("F0") + ", held " + held_hz.ToString("F0")
+                        + ", released " + off_hz.ToString("F0") + " Hz)");
+                }
+
                 // Debug: custom command (subcmd 0x02 device info) and its reply dump
                 byte* arg = stackalloc byte[44];
                 Jc.memset(arg, 0, 44);
