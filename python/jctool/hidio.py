@@ -9,8 +9,8 @@ CTCaer's Windows code expected it to behave, on every platform.
 
 Uses the `hidapi` package (cython-hidapi), which has wheels for Windows, macOS and Linux.
 On Linux its `hidraw` module is used (its `hid` module goes through libusb, which can't see
-Bluetooth controllers). On Android, jctool.android_usb (USB host / OTG) has the same
-interface.
+Bluetooth controllers). On Android, jctool.android_hid has the same interface: Bluetooth
+through the app's root hidraw bridge, USB through Android's USB host API.
 """
 import importlib
 import os
@@ -34,10 +34,14 @@ def is_android():
 
 def hid_module():
     """The HID backend: a module with enumerate(vid, pid) and device(), or None when there is
-    none. JCTOOL_HID_BACKEND=hidraw|libusb picks a hidapi module on Linux."""
+    none. JCTOOL_HID_BACKEND=hidraw|libusb picks a hidapi module on Linux, =bridge the
+    native hidraw helper (what Android uses for Bluetooth)."""
     if is_android():
-        from . import android_usb
-        return android_usb
+        from . import android_hid
+        return android_hid
+    if os.environ.get("JCTOOL_HID_BACKEND") == "bridge":
+        from . import hidraw_bridge
+        return hidraw_bridge
     names = ["hid"]
     if sys.platform.startswith("linux"):
         names = ["hid", "hidraw"] if os.environ.get("JCTOOL_HID_BACKEND") == "libusb" else ["hidraw", "hid"]
@@ -116,7 +120,11 @@ def list_hid_devices():
     hid = hid_module()
     if hid is None:
         return "The hidapi Python package is not installed."
-    lines = ["Backend: %s\n" % hid.__name__]
+    lines = ["Backend: %s" % getattr(hid, "DESCRIPTION", hid.__name__)]
+    bridge = sys.modules.get("jctool.hidraw_bridge")
+    if bridge is not None and bridge.last_error:
+        lines.append("Bluetooth bridge: %s" % bridge.last_error)
+    lines.append("")
     for d in hid.enumerate(0, 0):
         path = d.get("path")
         if isinstance(path, bytes):

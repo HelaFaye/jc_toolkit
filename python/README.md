@@ -65,14 +65,26 @@ doesn't see Bluetooth devices); `JCTOOL_HID_BACKEND=libusb` switches.
 
 ### Android
 
-Android doesn't let apps open Bluetooth controllers, so on Android the app works with a
-**Pro Controller on a USB cable** (or Joy-Cons in the Charging Grip) through a USB OTG
-adapter. Plug it in, then press Connect and allow the access in Android's dialog (or open
-the app from the "open with" prompt Android shows when you plug it in). Everything else is
-the same, except MIDI devices (MIDI files work). Backups, IR captures and the traffic log
-are saved in the app's folder (Android/data/org.jctool.jctool/files); after a backup the
-app also offers to save a copy anywhere (Downloads, Drive...). Files are opened with
-Android's file picker. On a phone the screens scroll; the tabs and the status bar stay.
+**Bluetooth (needs root: Magisk, KernelSU...).** Pair the Joy-Con or Pro Controller in
+Android's Bluetooth settings, then press Connect and allow the app root access. Android's
+Bluetooth service connects the controller and the kernel makes a `/dev/hidraw` node for
+it; only root can open that, so the app runs its native helper (`jctool-hidraw`, built with
+the NDK from `native/jctool_hidraw.c`) through `su`. The helper opens the node and relays
+the reports to the app over a pipe. If the kernel's `hid_nintendo` driver has the
+controller (it would send its own commands, like on desktop Linux), the helper moves it to
+`hid-generic` while the app uses it, and gives it back when the app lets go. Apps without
+root can't do this: Android's Bluetooth stack doesn't let apps open a controller's HID
+channels, and the NDK doesn't change that.
+
+**USB (no root).** A Pro Controller on a USB cable (or Joy-Cons in the Charging Grip)
+through a USB OTG adapter: plug it in, press Connect and allow the access in Android's
+dialog (or open the app from the prompt Android shows when you plug it in).
+
+Everything works the same, except MIDI devices (MIDI files work). Backups, IR captures and
+the traffic log are saved in the app's folder (Android/data/org.jctool.jctool/files); after
+a backup the app also offers to save a copy anywhere (Downloads, Drive...). Files are
+opened with Android's file picker. On a phone the screens scroll; the tabs and the status
+bar stay. The Debug tab's HID listing says why Bluetooth found nothing (e.g. root denied).
 
 ## Building
 
@@ -96,6 +108,9 @@ release).
   needs Java 17 and, on Debian/Ubuntu: `sudo apt install git zip unzip autoconf automake
   libtool pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev`.
   `scripts/build.py android release` makes an unsigned release APK/AAB to sign.
+  The Bluetooth helper is compiled with the NDK's clang for each of the APK's ABIs
+  (`jctool/native/<abi>/jctool-hidraw`) before buildozer packs the app;
+  `scripts/build.py helper` compiles only it.
 - `tools/make_icons.py` redraws the icons in `packaging/`.
 
 ## How it's built
@@ -104,6 +119,8 @@ release).
 |---|---|
 | `jctool/core.py` | The protocol: a port of `cli/jc_core.cpp` (CTCaer's `jctool.cpp` through the Linux build), with the same packets, reply checks and retries, and the Linux build's fixes (complete IR frames, auto exposure on the full sensor, a camera that ignores its resolution is detected and set up again, bounded NFC lengths) |
 | `jctool/hidio.py` | hidapi with the Windows behaviour the protocol expects (49-byte writes, 0-length reads drop a report), a lock per device, link health, the traffic log, the USB handshake (a controller on USB answers only after it) |
+| `jctool/android_hid.py` | Android's backend: Bluetooth through the hidraw bridge, USB through the USB host API |
+| `jctool/hidraw_bridge.py`, `native/jctool_hidraw.c` | The Bluetooth bridge: the app's side, and the native helper run through su (hidraw, hid_nintendo hand-off). `JCTOOL_HID_BACKEND=bridge` uses it on desktop Linux too |
 | `jctool/android_usb.py` | Android's USB host API with hidapi's interface: Java finds and opens the device, the reports go through usbdevfs |
 | `jctool/ops.py` | The features: info, battery, colors, backups, S/N, HD Rumble files, IR settings and images, NTAG dumps, debug commands |
 | `jctool/calibration.py` | Calibration reading/writing and the guided calibrations |
@@ -117,8 +134,9 @@ release).
 
 ```
 .venv/bin/python -m pytest        # the protocol, features, IR camera, calibrations, MIDI and
-                                  # the HID backends against emulated devices, and the app's
-                                  # self-test
+                                  # the HID backends against emulated devices (the Bluetooth
+                                  # helper is compiled with the system's C compiler and run
+                                  # over a fake /sys and /dev), and the app's self-test
 .venv/bin/jctool --selftest       # drives the app's screens (needs a display)
 ```
 

@@ -300,3 +300,4 @@ python/.venv/
 python/dist/
 python/.buildozer/
 python/*.egg-info/
+python/jctool/native/

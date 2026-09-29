@@ -22,9 +22,26 @@ def test_linux_uses_hidraw_for_bluetooth(monkeypatch):
     assert hidio.hid_module() is fake_hid
 
 
-def test_android_uses_usb_host(monkeypatch):
+def test_android_uses_bluetooth_bridge_and_usb_host(monkeypatch):
+    from jctool import android_hid
     monkeypatch.setenv("ANDROID_ARGUMENT", "")
-    assert hidio.hid_module() is android_usb
+    assert hidio.hid_module() is android_hid
+
+
+def test_android_lists_bluetooth_and_usb(monkeypatch):
+    from jctool import android_hid, hidraw_bridge
+    bt = {"path": "bt:0005:057E:2007.0003", "vendor_id": 0x057E, "product_id": 0x2007, "bus_type": 2}
+    usb_via_hidraw = {"path": "bt:0003:057E:2009.0004", "vendor_id": 0x057E, "product_id": 0x2009, "bus_type": 1}
+    usb = {"path": "/dev/bus/usb/001/002", "vendor_id": 0x057E, "product_id": 0x2009, "bus_type": 1}
+    monkeypatch.setattr(hidraw_bridge, "enumerate", lambda v, p: [bt, usb_via_hidraw])
+    monkeypatch.setattr(android_usb, "enumerate", lambda v, p: [usb])
+    assert android_hid.enumerate(0, 0) == [bt, usb]          # A USB controller is listed once
+    opened = []
+    monkeypatch.setattr(hidraw_bridge.device, "open_path", lambda self, path: opened.append(("bt", path)))
+    monkeypatch.setattr(android_usb.device, "open_path", lambda self, path: opened.append(("usb", path)))
+    android_hid.device().open_path(b"bt:0005:057E:2007.0003")
+    android_hid.device().open_path(b"/dev/bus/usb/001/002")
+    assert [k for k, _ in opened] == ["bt", "usb"]
 
 
 def fake_backend(entries):

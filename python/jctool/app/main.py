@@ -225,7 +225,7 @@ class JoyConToolkitApp(App):
             return
         found = enumerate_controllers()
         if not found:
-            self.set_status("No controller found. Plug a Pro Controller in (USB OTG), then Connect." if is_android()
+            self.set_status("No controller found. Bluetooth: pair it, allow root access. USB: plug it in (OTG)." if is_android()
                             else "No Joy-Con or Pro Controller found. Pair it, then Connect.", WARN)
             return
         if len(found) == 1:
