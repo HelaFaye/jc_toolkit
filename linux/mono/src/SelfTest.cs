@@ -248,12 +248,16 @@ namespace CppWinFormJoy
                 fake.imu_raw = new short[] { -45, -43, 4096 + 341, 25, -35, -36 + 2000 };  // Turning: ~140 deg/s
                 bool turned = pump_until(() => Math.Abs(motion.Turned) >= 180, 5000);
                 fake.imu_raw = new short[] { -45 - 120, -43 + 80, 4096 + 341, 25, -35, -36 };
+                // The turn needs the user's confirmation: nothing happens until then
+                pump_until(() => false, 1500);
+                bool waited = motion.Turning && !motion.Measured && motion.CanConfirmTurn;
+                motion.ConfirmTurn();
                 bool measured2 = pump_until(() => motion.Measured, 5000);
                 fake.imu_raw = null;
                 int[] m2 = motion.Result;
                 motion.TwoPositions = false;
-                Check(turn_asked && turned && measured2 && m2 != null && string.Join(",", m2) == "-45,-43,341,25,-35,-36",
-                    name + ": two-position motion calibration cancels the surface tilt (" + (m2 == null ? "none" : string.Join(",", m2))
+                Check(turn_asked && turned && waited && measured2 && m2 != null && string.Join(",", m2) == "-45,-43,341,25,-35,-36",
+                    name + ": two-position motion calibration: confirmed turn, cancels the surface tilt (" + (m2 == null ? "none" : string.Join(",", m2))
                     + ", turned " + (int)Math.Abs(motion.Turned) + ")");
 
                 // Back to factory calibration

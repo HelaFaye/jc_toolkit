@@ -432,7 +432,7 @@ public unsafe class MotionCalPanel : Panel
     enum Step { Idle, MeasureA, Turn, MeasureB, Done }
 
     readonly FormJoy form;
-    readonly Button btn_start, btn_save, btn_factory;
+    readonly Button btn_start, btn_save, btn_factory, btn_turned;
     readonly CheckBox chk_two;
     readonly Label lbl_steps, lbl_info, lbl_values;
     readonly PictureBox view;
@@ -472,7 +472,9 @@ public unsafe class MotionCalPanel : Panel
         btn_start.Click   += (s, e) => Start();
         btn_save.Click    += (s, e) => Save(true);
         btn_factory.Click += (s, e) => UseFactory(true);
-        Controls.AddRange(new Control[] { view, chk_two, lbl_steps, lbl_values, lbl_info, btn_start, btn_factory, btn_save });
+        btn_turned = CalUi.NewButton("Confirm turn", 104, 324, 117);
+        btn_turned.Click += (s, e) => ConfirmTurn();
+        Controls.AddRange(new Control[] { view, chk_two, lbl_steps, lbl_values, lbl_info, btn_start, btn_turned, btn_factory, btn_save });
 
         poll = new Timer { Interval = 15 };
         poll.Tick += (s, e) => { CalUi.ReadReports(p => add_report((u8*)p)); refresh(); };
@@ -530,10 +532,6 @@ public unsafe class MotionCalPanel : Panel
             have_sample = true;
             if (step == Step.Turn || step == Step.MeasureB)
                 turned += (last[5] - first[5]) * GyroDegPerCount * SampleSeconds;
-            if (step == Step.Turn && Math.Abs(Math.Abs(turned) - 180) <= TurnTolerance) {
-                step = Step.MeasureB;
-                restart_collection();
-            }
             if (step == Step.MeasureA || step == Step.MeasureB)
                 add_sample();
         }
@@ -541,6 +539,18 @@ public unsafe class MotionCalPanel : Panel
 
     internal double Turned { get { return turned; } }
     internal bool Turning { get { return step == Step.Turn; } }
+    bool turn_in_range() { return Math.Abs(Math.Abs(turned) - 180) <= TurnTolerance; }
+    internal bool CanConfirmTurn { get { return step == Step.Turn && turn_in_range(); } }
+
+    // The user confirms the 180 degree turn (the gyro must agree); then the second measurement.
+    public void ConfirmTurn()
+    {
+        if (!CanConfirmTurn)
+            return;
+        step = Step.MeasureB;
+        restart_collection();
+        refresh();
+    }
 
     void add_sample()
     {
@@ -562,7 +572,7 @@ public unsafe class MotionCalPanel : Panel
         if (problem == "" && (z < OneG * 3 / 4 || z > OneG * 5 / 4))
             problem = "Lay the controller flat (face up or down) on a level surface.";
         if (problem == "" && step == Step.MeasureB) {
-            if (Math.Abs(Math.Abs(turned) - 180) > TurnTolerance)
+            if (!turn_in_range())
                 problem = "Turn it back to 180° (" + (int)Math.Round(Math.Abs(turned)) + "° now).";
             else if (Math.Sign(last[2]) != Math.Sign(first[2]))
                 problem = "Keep the same side facing up; only turn it around.";
@@ -672,7 +682,7 @@ public unsafe class MotionCalPanel : Panel
         else
             t = mark(step > Step.Idle, step == Step.Idle) + "1. Place it flat, buttons up.\n" +
                 mark(step > Step.MeasureA, step == Step.MeasureA) + "2. Don't touch it (~2 s).\n" +
-                mark(step > Step.Turn, step == Step.Turn) + "3. Turn it 180° on the\n     surface, still flat.\n" +
+                mark(step > Step.Turn, step == Step.Turn) + "3. Turn it 180° on the\n     surface, still flat, then\n     click Confirm turn.\n" +
                 mark(step == Step.Done, step == Step.MeasureB) + "4. Don't touch it (~2 s).\n" +
                 mark(false, step == Step.Done) + "5. Save.";
         lbl_steps.Text = t;
@@ -698,7 +708,9 @@ public unsafe class MotionCalPanel : Panel
                 lbl_info.Text = !have_sample ? "Waiting for the controller.." : problem != "" ? problem : "Measuring, don't touch it..";
                 break;
             case Step.Turn:
-                lbl_info.Text = "Turn the controller around 180°, keeping it flat on the surface, then let go.";
+                lbl_info.Text = turn_in_range()
+                    ? "Turned 180°. Let go of the controller, then click Confirm turn."
+                    : "Turn the controller around 180°, keeping it flat on the surface (" + (int)Math.Round(Math.Abs(turned)) + "° so far).";
                 break;
             case Step.Done:
                 lbl_info.Text = "Measured. Click Save to write it to the controller (Start: measure again).";
@@ -713,6 +725,8 @@ public unsafe class MotionCalPanel : Panel
     {
         btn_start.Text = step == Step.Idle ? "Start" : "Restart";
         btn_save.Enabled = step == Step.Done && Result != null;
+        btn_turned.Visible = TwoPositions;
+        btn_turned.Enabled = CanConfirmTurn;
     }
 
     void draw_view(object sender, PaintEventArgs e)
