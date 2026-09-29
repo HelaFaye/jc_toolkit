@@ -203,14 +203,15 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
         this.lbl_calStatus.Text      = "";
         this.lbl_calStatus.Cursor    = Cursors.Hand;
         this.lbl_calStatus.Click    += (sender, e) => open_calibration();
-        this.link_calibrate = new LinkLabel();
-        this.link_calibrate.Font      = new System.Drawing.Font("Segoe UI", 9.75F);
-        this.link_calibrate.LinkColor = this.link_calibrate.ActiveLinkColor = System.Drawing.Color.FromArgb(255, 188, 0);
-        this.link_calibrate.Location  = new System.Drawing.Point(375, 95);
-        this.link_calibrate.Size      = new System.Drawing.Size(92, 20);
+        this.link_calibrate = new Label(); // Mono's LinkLabel clips right-aligned text
+        this.link_calibrate.Font      = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Underline);
+        this.link_calibrate.ForeColor = System.Drawing.Color.FromArgb(255, 188, 0);
+        this.link_calibrate.Cursor    = Cursors.Hand;
+        this.link_calibrate.Location  = new System.Drawing.Point(370, 95);
+        this.link_calibrate.Size      = new System.Drawing.Size(95, 20);
         this.link_calibrate.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
         this.link_calibrate.Text      = "Calibrate..";
-        this.link_calibrate.LinkClicked += (sender, e) => open_calibration();
+        this.link_calibrate.Click    += (sender, e) => open_calibration();
         this.Controls.AddRange(new Control[] { this.label_cal, this.lbl_calStatus, this.link_calibrate });
 
         // Linux: the Calibration screen gets tabs: guided Sticks and Motion calibration, and
@@ -378,7 +379,7 @@ public unsafe partial class FormJoy : System.Windows.Forms.Form
     internal string CalText { get { return this.lbl_calStatus.Text; } }
 
     private Label label_cal, lbl_calStatus;
-    private LinkLabel link_calibrate;
+    private Label link_calibrate;
     private StickCalPanel stickCalPanel;
     private MotionCalPanel motionCalPanel;
     private Control[] cal_pages;
