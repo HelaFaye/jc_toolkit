@@ -11,6 +11,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 
 def command():
+    if os.environ.get("JCTOOL_SKIP_GUI_TEST"):
+        return None
     cmd = [sys.executable, "-m", "jctool.app", "--selftest"]
     if os.environ.get("DISPLAY") or sys.platform in ("win32", "darwin"):
         return cmd

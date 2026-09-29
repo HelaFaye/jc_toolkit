@@ -8,6 +8,7 @@ import time
 from kivy.clock import Clock
 
 from .. import calibration, midi
+from . import storage
 
 
 class SelfTest:
@@ -69,7 +70,7 @@ class SelfTest:
         ir = app.panels["IR Camera"]
         ir.capture()
         def done():
-            self.check(ir.image.texture is not None and ir.image.texture.size == (240, 320) and os.path.exists("IRcamera.png")
+            self.check(ir.image.texture is not None and ir.image.texture.size == (240, 320) and os.path.exists(storage.data_path("IRcamera.png"))
                        and "Done" in ir.status.text, "IR capture shown and saved as IRcamera.png (%s)" % ir.status.text)
             self.next()
         self.wait(lambda: not ir.btn_capture.disabled, 20, done)

@@ -8,8 +8,13 @@ CTCaer's Windows code expected it to behave, on every platform.
 - Link health counters and the traffic log (traffic_log.txt, like the original's -d).
 
 Uses the `hidapi` package (cython-hidapi), which has wheels for Windows, macOS and Linux.
+On Linux its `hidraw` module is used (its `hid` module goes through libusb, which can't see
+Bluetooth controllers). On Android, jctool.android_usb (USB host / OTG) has the same
+interface.
 """
+import importlib
 import os
+import sys
 import threading
 import time
 
@@ -23,24 +28,46 @@ TYPE_NAMES = {NOTHING: "None", JOYCON_L: "Joy-Con (L)", JOYCON_R: "Joy-Con (R)",
 OUTPUT_REPORT_LENGTH = 49
 
 
+def is_android():
+    return "ANDROID_ARGUMENT" in os.environ or "ANDROID_PRIVATE" in os.environ
+
+
 def hid_module():
-    """The hidapi module, or None when it isn't installed."""
-    try:
-        import hid
-        return hid
-    except ImportError:
-        return None
+    """The HID backend: a module with enumerate(vid, pid) and device(), or None when there is
+    none. JCTOOL_HID_BACKEND=hidraw|libusb picks a hidapi module on Linux."""
+    if is_android():
+        from . import android_usb
+        return android_usb
+    names = ["hid"]
+    if sys.platform.startswith("linux"):
+        names = ["hid", "hidraw"] if os.environ.get("JCTOOL_HID_BACKEND") == "libusb" else ["hidraw", "hid"]
+    for name in names:
+        try:
+            return importlib.import_module(name)
+        except ImportError:
+            pass
+    return None
+
+
+def is_usb(d):
+    """A hidapi enumerate() entry for a USB device (hidapi 0.14+ gives bus_type; before
+    that, only USB devices have an interface number)."""
+    bus = d.get("bus_type")
+    if bus is not None:
+        return int(bus) == 1
+    return d.get("interface_number", -1) >= 0
 
 
 class Found:
     """A controller seen by enumerate_controllers()."""
 
-    def __init__(self, path, type_, name, serial="", third_party=False):
+    def __init__(self, path, type_, name, serial="", third_party=False, usb=False):
         self.path = path
         self.type = type_
         self.name = name
         self.serial = serial
         self.third_party = third_party
+        self.usb = usb
 
     def __repr__(self):
         return "Found(%r, %s)" % (self.name, self.path)
@@ -71,7 +98,10 @@ def enumerate_controllers():
         if isinstance(path, bytes):
             path = path.decode("utf-8", "replace")
         name = 'Third-party "Wireless Gamepad" (as Pro Controller)' if third else TYPE_NAMES[t]
-        found.append(Found(path, t, name, d.get("serial_number") or "", third))
+        usb = is_usb(d)
+        if usb:
+            name += " (USB)"
+        found.append(Found(path, t, name, d.get("serial_number") or "", third, usb))
     # One entry per path (some platforms list a device once per usage)
     seen, unique = set(), []
     for f in found:
@@ -86,7 +116,7 @@ def list_hid_devices():
     hid = hid_module()
     if hid is None:
         return "The hidapi Python package is not installed."
-    lines = []
+    lines = ["Backend: %s\n" % hid.__name__]
     for d in hid.enumerate(0, 0):
         path = d.get("path")
         if isinstance(path, bytes):
@@ -137,7 +167,28 @@ class Device:
         raw = hid.device()
         path = found.path.encode() if isinstance(found.path, str) else found.path
         raw.open_path(path)
-        return cls(raw, found.type, found.path)
+        dev = cls(raw, found.type, found.path)
+        if found.usb:
+            dev.usb_handshake()
+        return dev
+
+    def usb_handshake(self):
+        """Over USB a controller answers subcommands only after this: handshake, 3Mbit
+        baud rate, handshake again, then HID only (no USB timeout). Returns True when it
+        answered."""
+        answered = True
+        for cmd in (0x02, 0x03, 0x02, 0x04):
+            self.write(bytes([0x80, cmd]))
+            if cmd == 0x04:
+                break
+            for _ in range(10):
+                n, buf = self.read(64, 50)
+                if n > 1 and buf[0] == 0x81 and buf[1] == cmd:
+                    break
+            else:
+                answered = False
+        self.note("USB handshake %s" % ("done" if answered else "not answered"))
+        return answered
 
     def _now_ms(self):
         return (time.monotonic() - self._clock0) * 1000.0

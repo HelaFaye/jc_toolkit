@@ -41,7 +41,7 @@ Others:
 
 Joy-Con Toolkit runs natively on Linux with Mono. See [linux/README.md](linux/README.md) for install, build and step-by-step testing instructions, and [docs/LINUX_PORTING.md](docs/LINUX_PORTING.md) for how the port was done.
 
-## Python / Kivy (Windows, macOS, Linux)
+## Python / Kivy (Windows, macOS, Linux, Android)
 
 A cross-platform port in Python with a Kivy interface, with every feature above plus guided calibration and MIDI on the HD Rumble. See [python/README.md](python/README.md).
 

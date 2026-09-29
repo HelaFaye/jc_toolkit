@@ -296,3 +296,7 @@ build/
 __pycache__/
 *.pyc
 .pytest_cache/
+python/.venv/
+python/dist/
+python/.buildozer/
+python/*.egg-info/

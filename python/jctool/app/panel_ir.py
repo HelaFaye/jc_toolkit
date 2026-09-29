@@ -12,6 +12,7 @@ from kivy.uix.widget import Widget
 from .. import ops
 from ..hidio import JOYCON_R
 from ..png import write_png_rgb
+from . import storage
 from .panels import Panel
 from .widgets import ACCENT, DARK, DIM, ERROR, TEXT, WARN, Btn, Check, Choice, Field, Filled, Lbl, Section, SliderRow, message
 
@@ -101,7 +102,7 @@ class IrPanel(Panel):
         for b in (self.btn_capture, self.btn_stream, self.btn_live):
             row.add_widget(b)
         right.add_widget(row)
-        right.add_widget(Lbl("Captures are saved as IRcamera.png (in the folder the app runs from).",
+        right.add_widget(Lbl("Captures are saved as %s" % storage.data_path("IRcamera.png"),
                              color=DIM, font_size=dp(12), size_hint_y=None, height=dp(22)))
         self.add_widget(right)
 
@@ -183,4 +184,4 @@ class IrPanel(Panel):
         self.image.texture = tex
         self.image.opacity = 1
         if save and not self.streaming:
-            write_png_rgb("IRcamera.png", rgb, w, h)
+            write_png_rgb(storage.data_path("IRcamera.png"), rgb, w, h)

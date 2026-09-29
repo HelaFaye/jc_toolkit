@@ -15,8 +15,9 @@ from kivy.uix.widget import Widget
 
 from .. import ops
 from ..hidio import JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, list_hid_devices
+from . import storage
 from .widgets import (ACCENT, BACK, BUTTON, DARK, DIM, ERROR, GRID, TEXT, WARN, Btn, Check, Choice, Field,
-                      Filled, Lbl, Mono, Section, choose_file, confirm, message, rgba)
+                      Filled, Lbl, Mono, Section, confirm, message, rgba)
 
 
 class Panel(BoxLayout):
@@ -288,7 +289,7 @@ class BackupPanel(Panel):
                         lambda: self.dump(path))
             else:
                 self.dump(path)
-        self.run(ops.backup_filename, lambda name: choose_file("Save the SPI backup", chosen, save_name=name))
+        self.run(ops.backup_filename, lambda name: storage.save_file("Save the SPI backup", name, chosen))
 
     def dump(self, path):
         self.btn_cancel.disabled = False
@@ -312,6 +313,7 @@ class BackupPanel(Panel):
                 message("Backup", "Cancelled. %s is incomplete." % os.path.basename(path))
             elif r[0] == 0:
                 message("Backup", "Done dumping SPI!\n\nSaved to %s" % path)
+                storage.export(path)
             else:
                 message("Backup", "Failed to dump the SPI chip!")
         self.run(work, done, long_running=True, name="the SPI backup")
@@ -347,7 +349,7 @@ class BackupPanel(Panel):
                     self.loaded.color = ACCENT if same else WARN
                 self.update_buttons()
             self.run(lambda jc: ops.device_info(jc).mac_bytes, checked)
-        choose_file("Load an SPI backup", chosen, filters=["*.bin"])
+        storage.open_file("Load an SPI backup", chosen, filters=["*.bin"])
 
     def restore(self, what):
         if not self.app.need_device():
@@ -633,7 +635,7 @@ class DebugPanel(Panel):
         if self.jc is None:
             return
         if on:
-            self.jc.dev.enable_traffic_log("traffic_log.txt")
+            self.jc.dev.enable_traffic_log(storage.data_path("traffic_log.txt"))
         elif self.jc.dev.traffic_log is not None:
             self.jc.dev.traffic_log.close()
             self.jc.dev.traffic_log = None

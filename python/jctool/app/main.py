@@ -1,4 +1,4 @@
-"""The Joy-Con Toolkit app (Kivy): runs on Windows, macOS and Linux.
+"""The Joy-Con Toolkit app (Kivy): runs on Windows, macOS, Linux and Android.
 
     python -m jctool.app            the controller(s) found
     python -m jctool.app --demo     an emulated controller (no hardware)
@@ -17,13 +17,18 @@ from kivy.metrics import dp                                # noqa: E402
 from kivy.uix.boxlayout import BoxLayout                   # noqa: E402
 from kivy.uix.gridlayout import GridLayout                 # noqa: E402
 from kivy.uix.screenmanager import NoTransition, Screen, ScreenManager   # noqa: E402
+from kivy.uix.scrollview import ScrollView                 # noqa: E402
 
 from .. import calibration, ops                            # noqa: E402
 from ..core import JoyCon, Ui                              # noqa: E402
-from ..hidio import Device, JOYCON_L, JOYCON_R, NOTHING, PROCON, TYPE_NAMES, enumerate_controllers   # noqa: E402
+from ..hidio import Device, JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, enumerate_controllers, is_android   # noqa: E402
 from .widgets import (ACCENT, BACK, DARK, DIM, ERROR, TEXT, WARN, Btn, Filled, Lbl, Tab, Choice,   # noqa: E402
                       confirm, message)
 from .worker import DeviceWorker                           # noqa: E402
+from . import storage                                      # noqa: E402
+
+
+PANEL_MIN = (920, 480)       # dp: screens smaller than this scroll (phones)
 
 
 class AppUi(Ui):
@@ -86,6 +91,7 @@ class InfoRow(BoxLayout):
 
 class JoyConToolkitApp(App):
     title = "Joy-Con Toolkit v5.2.0"
+    icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
 
     def __init__(self, demo=False, traffic_log=False, **kw):
         super().__init__(**kw)
@@ -102,9 +108,12 @@ class JoyConToolkitApp(App):
     def build(self):
         from . import panels
         Window.clearcolor = BACK
-        Window.minimum_width, Window.minimum_height = 960, 680
-        if Window.width < 1000:
-            Window.size = (1040, 720)
+        if not is_android() and not os.environ.get("JCTOOL_WINDOW"):
+            Window.minimum_width, Window.minimum_height = 960, 680
+            if Window.width < 1000:
+                Window.size = (1040, 720)
+        if os.environ.get("JCTOOL_WINDOW"):          # WxH: try other screen sizes (phones)
+            Window.size = tuple(int(v) for v in os.environ["JCTOOL_WINDOW"].split("x"))
         root = Filled(orientation="vertical", color=BACK, padding=[dp(10), dp(8), dp(10), 0], spacing=dp(6))
 
         # Info section
@@ -124,7 +133,15 @@ class JoyConToolkitApp(App):
 
         # Tabs and screens
         self.tabs = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(3))
-        self.screens = ScreenManager(transition=NoTransition())
+        self.screens = ScreenManager(transition=NoTransition(), size_hint=(None, None))
+        # Small screens (phones): the screens scroll, the tabs and the status bar stay
+        area = ScrollView(do_scroll_x=True, do_scroll_y=True, bar_width=dp(5), bar_color=ACCENT,
+                          scroll_type=["bars", "content"])
+
+        def fit(*_):
+            self.screens.size = (max(area.width, dp(PANEL_MIN[0])), max(area.height, dp(PANEL_MIN[1])))
+        area.bind(size=fit)
+        area.add_widget(self.screens)
         for name, cls in panels.PANELS:
             panel = cls(self)
             self.panels[name] = panel
@@ -135,7 +152,7 @@ class JoyConToolkitApp(App):
             tab.bind(on_press=lambda t, n=name: self.show(n))
             self.tabs.add_widget(tab)
         root.add_widget(self.tabs)
-        root.add_widget(self.screens)
+        root.add_widget(area)
 
         # Status bar
         bar = Filled(orientation="horizontal", size_hint_y=None, height=dp(30), color=DARK,
@@ -208,7 +225,8 @@ class JoyConToolkitApp(App):
             return
         found = enumerate_controllers()
         if not found:
-            self.set_status("No Joy-Con or Pro Controller found. Pair it, then Connect.", WARN)
+            self.set_status("No controller found. Plug a Pro Controller in (USB OTG), then Connect." if is_android()
+                            else "No Joy-Con or Pro Controller found. Pair it, then Connect.", WARN)
             return
         if len(found) == 1:
             return self._open_found(found[0])
@@ -220,7 +238,9 @@ class JoyConToolkitApp(App):
             try:
                 dev = Device.open(f)
             except Exception as e:
-                message("Can't open the controller", "%s\n\n%s\n\nOn Linux, see the README (udev rule, hid_nintendo)." % (f.name, e))
+                hint = ("" if is_android() else "\n\nOn Linux, see the README (udev rule, hid_nintendo)."
+                        if sys.platform.startswith("linux") else "")
+                message("Can't open the controller", "%s\n\n%s%s" % (f.name, e, hint))
                 return
             self.open_device(dev)
         if f.third_party:
@@ -233,7 +253,7 @@ class JoyConToolkitApp(App):
         if self.jc is not None:
             self.jc.dev.close()
         if self.traffic_log:
-            dev.enable_traffic_log("traffic_log.txt")
+            dev.enable_traffic_log(storage.data_path("traffic_log.txt"))
         self.jc = JoyCon(dev, AppUi(self))
         self.worker.jc = self.jc
 

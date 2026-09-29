@@ -1,0 +1,7 @@
+<!-- Added to the app's activity: Android offers to open the app when a controller is
+     plugged in (USB OTG), and grants it access to that controller. -->
+<intent-filter>
+    <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+</intent-filter>
+<meta-data android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+           android:resource="@xml/device_filter" />

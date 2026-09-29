@@ -12,9 +12,10 @@ from kivy.uix.widget import Widget
 
 from .. import midi, ops
 from ..hidio import JOYCON_L
+from . import storage
 from .panels import Panel
 from .widgets import (ACCENT, DARK, DIM, ERROR, GRID, TEXT, WARN, Btn, Check, Choice, Field, Lbl, Section,
-                      SliderRow, Tab, choose_file, message)
+                      SliderRow, Tab, message)
 
 
 class FilesTab(BoxLayout):
@@ -67,7 +68,7 @@ class FilesTab(BoxLayout):
             self.info.text = "%s\nType: %s\nSample rate: %dms\nSamples: %d (%.2fs)" % (
                 os.path.basename(path), v.type_name, v.sample_rate, v.samples, v.seconds)
             self.info.color = ACCENT
-        choose_file("Load an HD Rumble file", chosen, filters=["*.bnvib", "*.jcvib"])
+        storage.open_file("Load an HD Rumble file", chosen, filters=["*.bnvib", "*.jcvib"])
 
     def play(self):
         jc = self.panel.jc
@@ -210,7 +211,7 @@ class MidiTab(BoxLayout):
             self.part.values = ["All parts (no drums)"] + [str(p) for p in s.parts]
             self.part.index = 0
             self.refresh()
-        choose_file("Open a MIDI file", chosen, filters=["*.mid", "*.midi", "*.MID"])
+        storage.open_file("Open a MIDI file", chosen, filters=["*.mid", "*.midi", "*.MID"])
 
     def play_or_stop(self):
         if self.player.playing:
