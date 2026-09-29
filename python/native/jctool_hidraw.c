@@ -242,6 +242,23 @@ static void sleep_ms(int ms)
 	nanosleep(&ts, NULL);
 }
 
+/* hid-generic binds a device only while hid.ignore_special_drivers is on when a special
+ * driver (hid_nintendo) also matches it: "No such device" otherwise. */
+static int bind_generic(const char *id)
+{
+	char param[PATH_MAX], path[PATH_MAX], old[16] = "0";
+	int res, changed;
+	path_of(param, sizeof(param), "/sys/module/hid/parameters/ignore_special_drivers");
+	if (read_text(param, old, sizeof(old)) > 0)
+		old[strcspn(old, "\n")] = 0;
+	changed = strcmp(old, "0") == 0 && write_text(param, "1") == 0;
+	path_of(path, sizeof(path), "/sys/bus/hid/drivers/hid-generic/bind");
+	res = write_text(path, id);
+	if (changed)
+		write_text(param, old);
+	return res;
+}
+
 /* hid_nintendo sends its own commands and changes the report mode: move the device to
  * hid-generic (its hidraw node is made again, maybe with another number). */
 static int take_from_nintendo(const char *id, char *node, size_t size)
@@ -252,8 +269,8 @@ static int take_from_nintendo(const char *id, char *node, size_t size)
 	if (write_text(path, id) < 0)
 		return -1;
 	snprintf(moved_id, sizeof(moved_id), "%s", id);
-	path_of(path, sizeof(path), "/sys/bus/hid/drivers/hid-generic/bind");
-	write_text(path, id);
+	if (bind_generic(id) < 0)
+		return -1;
 	for (i = 0; i < 100; i++) {         /* Up to 2s for the new hidraw node */
 		if (hidraw_of(id, node, size) == 0) {
 			path_of(path, sizeof(path), "/dev/%s", node);
