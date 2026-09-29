@@ -80,7 +80,7 @@ public unsafe class StickCalPanel : Panel
     enum Step { Idle, Center, Rotate, Done }
 
     readonly FormJoy form;
-    readonly Button btn_left, btn_right, btn_start, btn_finish, btn_save;
+    readonly Button btn_left, btn_right, btn_start, btn_finish, btn_save, btn_factory;
     readonly Label lbl_title, lbl_step1, lbl_step2, lbl_step3, lbl_info, lbl_values;
     readonly PictureBox view;
     readonly Timer poll;
@@ -121,11 +121,13 @@ public unsafe class StickCalPanel : Panel
         btn_start  = CalUi.NewButton("Start", 4, 324);
         btn_finish = CalUi.NewButton("Finish", 104, 324);
         btn_save   = CalUi.NewButton("Save", 346, 324);
+        btn_factory = CalUi.NewButton("Use factory", 225, 324, 117);
+        btn_factory.Click += (s, e) => UseFactory(true);
         btn_start.Click  += (s, e) => Start();
         btn_finish.Click += (s, e) => Finish();
         btn_save.Click   += (s, e) => Save(true);
         Controls.AddRange(new Control[] { view, btn_left, btn_right, lbl_title, lbl_step1, lbl_step2, lbl_step3,
-                                          lbl_values, lbl_info, btn_start, btn_finish, btn_save });
+                                          lbl_values, lbl_info, btn_start, btn_finish, btn_factory, btn_save });
 
         poll = new Timer { Interval = 15 };
         poll.Tick += (s, e) => { CalUi.ReadReports(p => add_report((u8*)p)); refresh(); };
@@ -278,9 +280,30 @@ public unsafe class StickCalPanel : Panel
         encode_stick_params(cal + (left ? 5 : 2), pair);
         pair[0] = (u16)(r[1] - r[0]); pair[1] = (u16)(r[4] - r[3]);
         encode_stick_params(cal + (left ? 8 : 5), pair);
-        int res = write_spi_data(left ? 0x8010u : 0x801Bu, 11, cal);
+        return written(write_spi_data(left ? 0x8010u : 0x801Bu, 11, cal), "Saved. The controller now uses this calibration.");
+    }
+
+    // Erases this stick's user calibration: the controller goes back to the factory one.
+    public int UseFactory(bool confirm)
+    {
+        if (form.check_connection_lost())
+            return -1;
+        if (confirm && MessageBox.Show("Erase the " + stick_name().ToLower() + " user calibration? The controller goes back to its factory calibration.",
+                "Stick calibration", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return -1;
+        Stop();
+        u8* cal = stackalloc u8[11];
+        memset(cal, 0xFF, 11);
+        step = Step.Idle;
+        Result = null;
+        refresh();
+        return written(write_spi_data(left ? 0x8010u : 0x801Bu, 11, cal), "Done. The " + stick_name().ToLower() + " uses its factory calibration.");
+    }
+
+    int written(int res, string ok)
+    {
         form.calibration_written();
-        lbl_info.Text = res == 0 ? "Saved. The controller now uses this calibration." : "Failed to write the calibration. Please try again.";
+        lbl_info.Text = res == 0 ? ok : "Failed to write the calibration. Please try again.";
         lbl_info.ForeColor = res == 0 ? CalUi.Accent : CalUi.Warn;
         return res;
     }
@@ -399,11 +422,18 @@ public unsafe class MotionCalPanel : Panel
     const int GyroMaxSpread = 40;    // Raw counts; a still Joy-Con varies by ~10
     const int AccMaxSpread = 150;
     const int OneG = 4096;           // Accelerometer at +-8G: 4096 counts per G
+    const double GyroDegPerCount = 0.070; // +-2000 dps range (nominal; 936 / 13371)
+    const double SampleSeconds = 0.005;   // 3 samples per 15ms report
+    const double TurnTolerance = 25;      // Degrees around 180
 
-    enum Step { Idle, Measure, Done }
+    // One position: offsets from a single still measurement (the surface's tilt ends up in
+    // the accelerometer X/Y offsets). Two positions: measure, turn the controller 180 degrees
+    // flat on the same surface, measure again: the tilt reverses and averages out.
+    enum Step { Idle, MeasureA, Turn, MeasureB, Done }
 
     readonly FormJoy form;
-    readonly Button btn_start, btn_save;
+    readonly Button btn_start, btn_save, btn_factory;
+    readonly CheckBox chk_two;
     readonly Label lbl_steps, lbl_info, lbl_values;
     readonly PictureBox view;
     readonly Timer poll;
@@ -414,6 +444,8 @@ public unsafe class MotionCalPanel : Panel
     readonly long[] sum = new long[6];
     readonly short[] lo = new short[6], hi = new short[6];
     int count;
+    readonly double[] first = new double[6];  // Means of the first position
+    double turned;                            // Degrees around Z since the first position
     string problem = "";
 
     // Acc origin X, Y, Z, gyro origin X, Y, Z (raw) once measured
@@ -428,19 +460,26 @@ public unsafe class MotionCalPanel : Panel
 
         view = new PictureBox { Location = new Point(4, 0), Size = new Size(240, 274), BackColor = CalUi.Dark };
         view.Paint += draw_view;
-        lbl_steps = CalUi.NewLabel(254, 0, 196, 150);
-        lbl_values = CalUi.NewLabel(254, 150, 196, 124, 8.25F);
+        chk_two = new CheckBox { Location = new Point(254, 0), Size = new Size(196, 36), ForeColor = CalUi.Warn, BackColor = CalUi.Back,
+                                 Font = new Font("Segoe UI", 9F), Text = "Two positions: turn it 180° (more accurate)" };
+        chk_two.CheckedChanged += (s, e) => { if (step != Step.Idle) Reset(); else refresh(); };
+        lbl_steps = CalUi.NewLabel(254, 40, 196, 150, 8.25F);
+        lbl_values = CalUi.NewLabel(254, 192, 196, 82, 8.25F);
         lbl_info = CalUi.NewLabel(4, 280, 442, 38);
-        btn_start = CalUi.NewButton("Start", 4, 324);
-        btn_save  = CalUi.NewButton("Save", 346, 324);
-        btn_start.Click += (s, e) => Start();
-        btn_save.Click  += (s, e) => Save(true);
-        Controls.AddRange(new Control[] { view, lbl_steps, lbl_values, lbl_info, btn_start, btn_save });
+        btn_start   = CalUi.NewButton("Start", 4, 324);
+        btn_factory = CalUi.NewButton("Use factory", 225, 324, 117);
+        btn_save    = CalUi.NewButton("Save", 346, 324);
+        btn_start.Click   += (s, e) => Start();
+        btn_save.Click    += (s, e) => Save(true);
+        btn_factory.Click += (s, e) => UseFactory(true);
+        Controls.AddRange(new Control[] { view, chk_two, lbl_steps, lbl_values, lbl_info, btn_start, btn_factory, btn_save });
 
         poll = new Timer { Interval = 15 };
         poll.Tick += (s, e) => { CalUi.ReadReports(p => add_report((u8*)p)); refresh(); };
         Reset();
     }
+
+    internal bool TwoPositions { get { return chk_two.Checked; } set { chk_two.Checked = value; } }
 
     public void Reset()
     {
@@ -461,7 +500,8 @@ public unsafe class MotionCalPanel : Panel
         restart_collection();
         Result = null;
         have_sample = false;
-        step = Step.Measure;
+        turned = 0;
+        step = Step.MeasureA;
         poll.Start();
         refresh();
     }
@@ -488,10 +528,19 @@ public unsafe class MotionCalPanel : Panel
             for (int i = 0; i < 6; i++)
                 last[i] = v[i];
             have_sample = true;
-            if (step == Step.Measure)
+            if (step == Step.Turn || step == Step.MeasureB)
+                turned += (last[5] - first[5]) * GyroDegPerCount * SampleSeconds;
+            if (step == Step.Turn && Math.Abs(Math.Abs(turned) - 180) <= TurnTolerance) {
+                step = Step.MeasureB;
+                restart_collection();
+            }
+            if (step == Step.MeasureA || step == Step.MeasureB)
                 add_sample();
         }
     }
+
+    internal double Turned { get { return turned; } }
+    internal bool Turning { get { return step == Step.Turn; } }
 
     void add_sample()
     {
@@ -512,19 +561,42 @@ public unsafe class MotionCalPanel : Panel
         int z = Math.Abs(last[2]);
         if (problem == "" && (z < OneG * 3 / 4 || z > OneG * 5 / 4))
             problem = "Lay the controller flat (face up or down) on a level surface.";
+        if (problem == "" && step == Step.MeasureB) {
+            if (Math.Abs(Math.Abs(turned) - 180) > TurnTolerance)
+                problem = "Turn it back to 180° (" + (int)Math.Round(Math.Abs(turned)) + "° now).";
+            else if (Math.Sign(last[2]) != Math.Sign(first[2]))
+                problem = "Keep the same side facing up; only turn it around.";
+        }
         if (problem != "") {
             restart_collection();
             return;
         }
-        if (count >= NeedSamples)
-            finish();
+        if (count < NeedSamples)
+            return;
+        if (step == Step.MeasureA && TwoPositions) {
+            for (int i = 0; i < 6; i++)
+                first[i] = (double)sum[i] / count;
+            turned = 0;
+            step = Step.Turn;
+            restart_collection();
+            return;
+        }
+        finish();
     }
 
     void finish()
     {
+        var mean = new double[6];
+        for (int i = 0; i < 6; i++)
+            mean[i] = (double)sum[i] / count;
+        if (step == Step.MeasureB) {
+            // Turned 180 degrees: the tilt's share of X/Y reversed, the sensor offsets didn't
+            for (int i = 0; i < 6; i++)
+                mean[i] = (mean[i] + first[i]) / 2;
+        }
         var r = new int[6];
         for (int i = 0; i < 6; i++)
-            r[i] = (int)Math.Round((double)sum[i] / count);
+            r[i] = (int)Math.Round(mean[i]);
         // At rest the accelerometer reads 1G on Z; the offset is what's left
         r[2] -= r[2] > 0 ? OneG : -OneG;
         Result = r;
@@ -555,28 +627,65 @@ public unsafe class MotionCalPanel : Panel
             cal[8 + i]  = factory[6 + i];   // Acc sensitivity
             cal[20 + i] = factory[18 + i];  // Gyro sensitivity
         }
-        int res = write_spi_data(0x8026, 26, cal);
+        return written(write_spi_data(0x8026, 26, cal), "Saved. The controller now uses this calibration.");
+    }
+
+    // Erases the 6-axis user calibration: the controller goes back to the factory one.
+    public int UseFactory(bool confirm)
+    {
+        if (form.check_connection_lost())
+            return -1;
+        if (confirm && MessageBox.Show("Erase the motion user calibration? The controller goes back to its factory calibration.",
+                "Motion calibration", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            return -1;
+        Stop();
+        u8* cal = stackalloc u8[26];
+        memset(cal, 0xFF, 26);
+        int res = written(write_spi_data(0x8026, 26, cal), "Done. The controller uses its factory motion calibration.");
+        step = Step.Idle;
+        Result = null;
+        refresh_buttons();
+        return res;
+    }
+
+    int written(int res, string ok)
+    {
         form.calibration_written();
-        lbl_info.Text = res == 0 ? "Saved. The controller now uses this calibration." : "Failed to write the calibration. Please try again.";
+        lbl_info.Text = res == 0 ? ok : "Failed to write the calibration. Please try again.";
         lbl_info.ForeColor = res == 0 ? CalUi.Accent : CalUi.Warn;
         return res;
     }
 
+    static string mark(bool done, bool current)
+    {
+        return done ? "✔ " : current ? "▶ " : "   ";
+    }
+
     void refresh()
     {
-        string m1 = step == Step.Idle ? "▶ " : "✔ ";
-        string m2 = step == Step.Measure ? "▶ " : step == Step.Done ? "✔ " : "   ";
-        string m3 = step == Step.Done ? "▶ " : "   ";
-        lbl_steps.Text = m1 + "1. Place it\n     On a flat, level, still surface,\n     buttons facing up.\n\n" +
-                         m2 + "2. Measure\n     Don't touch it (~2 seconds).\n\n" +
-                         m3 + "3. Save\n     Write it to the controller.";
+        bool two = TwoPositions;
+        string t;
+        if (!two)
+            t = mark(step > Step.Idle, step == Step.Idle) + "1. Place it flat and level,\n     buttons facing up.\n\n" +
+                mark(step == Step.Done, step == Step.MeasureA) + "2. Don't touch it (~2 seconds).\n\n" +
+                mark(false, step == Step.Done) + "3. Save.";
+        else
+            t = mark(step > Step.Idle, step == Step.Idle) + "1. Place it flat, buttons up.\n" +
+                mark(step > Step.MeasureA, step == Step.MeasureA) + "2. Don't touch it (~2 s).\n" +
+                mark(step > Step.Turn, step == Step.Turn) + "3. Turn it 180° on the\n     surface, still flat.\n" +
+                mark(step == Step.Done, step == Step.MeasureB) + "4. Don't touch it (~2 s).\n" +
+                mark(false, step == Step.Done) + "5. Save.";
+        lbl_steps.Text = t;
         lbl_steps.ForeColor = step == Step.Idle ? CalUi.Text : CalUi.Accent;
+        chk_two.Enabled = step == Step.Idle || step == Step.Done;
 
         string v = "";
         if (have_sample)
             v = String.Format("Acc:   {0,6} {1,6} {2,6}\nGyro: {3,6} {4,6} {5,6}\n", last[0], last[1], last[2], last[3], last[4], last[5]);
+        if (step == Step.Turn || step == Step.MeasureB)
+            v += "Turned: " + (int)Math.Round(Math.Abs(turned)) + "°\n";
         if (Result != null)
-            v += String.Format("\nOffsets found:\nAcc:   {0,6} {1,6} {2,6}\nGyro: {3,6} {4,6} {5,6}",
+            v += String.Format("Offsets found:\nAcc:   {0,6} {1,6} {2,6}\nGyro: {3,6} {4,6} {5,6}",
                                Result[0], Result[1], Result[2], Result[3], Result[4], Result[5]);
         lbl_values.Text = v;
 
@@ -584,17 +693,26 @@ public unsafe class MotionCalPanel : Panel
             case Step.Idle:
                 lbl_info.Text = "Measures the motion sensors' offsets (fixes drift) and writes them as the 6-axis user calibration. Place the controller, then click Start.";
                 break;
-            case Step.Measure:
+            case Step.MeasureA:
+            case Step.MeasureB:
                 lbl_info.Text = !have_sample ? "Waiting for the controller.." : problem != "" ? problem : "Measuring, don't touch it..";
+                break;
+            case Step.Turn:
+                lbl_info.Text = "Turn the controller around 180°, keeping it flat on the surface, then let go.";
                 break;
             case Step.Done:
                 lbl_info.Text = "Measured. Click Save to write it to the controller (Start: measure again).";
                 break;
         }
-        lbl_info.ForeColor = step == Step.Measure && problem != "" ? CalUi.Warn : CalUi.Text;
-        btn_start.Text = step == Step.Idle ? "Start" : "Restart";
-        btn_save.Enabled = step == Step.Done;
+        lbl_info.ForeColor = (step == Step.MeasureA || step == Step.MeasureB) && problem != "" ? CalUi.Warn : CalUi.Text;
+        refresh_buttons();
         view.Invalidate();
+    }
+
+    void refresh_buttons()
+    {
+        btn_start.Text = step == Step.Idle ? "Start" : "Restart";
+        btn_save.Enabled = step == Step.Done && Result != null;
     }
 
     void draw_view(object sender, PaintEventArgs e)
@@ -610,6 +728,15 @@ public unsafe class MotionCalPanel : Panel
             g.DrawLine(pen, cx - r, cy, cx + r, cy);
             g.DrawLine(pen, cx, cy - r, cx, cy + r);
         }
+        // Two positions: the turn so far, as an arc toward the 180 degree mark
+        if (step == Step.Turn || step == Step.MeasureB || (step == Step.Done && TwoPositions)) {
+            float box = r + 8;
+            using (var pen = new Pen(CalUi.Grid, 6))
+                g.DrawArc(pen, cx - box, cy - box, 2 * box, 2 * box, -90, 180);
+            float sweep = (float)Math.Min(200, Math.Abs(turned));
+            using (var pen = new Pen(Math.Abs(Math.Abs(turned) - 180) <= TurnTolerance ? CalUi.Accent : CalUi.Warn, 6))
+                g.DrawArc(pen, cx - box, cy - box, 2 * box, 2 * box, -90, sweep);
+        }
         if (have_sample) {
             float bx = Math.Max(-1, Math.Min(1, last[1] / (float)(OneG / 2)));
             float by = Math.Max(-1, Math.Min(1, last[0] / (float)(OneG / 2)));
@@ -617,15 +744,23 @@ public unsafe class MotionCalPanel : Panel
             using (var b = new SolidBrush(level ? CalUi.Accent : CalUi.Warn))
                 g.FillEllipse(b, cx + bx * (r - 12) - 12, cy + by * (r - 12) - 12, 24, 24);
         }
-        // Progress of the still measurement
-        float progress = step == Step.Done ? 1 : step == Step.Measure ? Math.Min(1, count / (float)NeedSamples) : 0;
+        // Progress of the still measurement(s)
+        float progress = 0;
+        if (step == Step.Done)
+            progress = 1;
+        else if (step == Step.MeasureA)
+            progress = Math.Min(1, count / (float)NeedSamples) / (TwoPositions ? 2 : 1);
+        else if (step == Step.Turn)
+            progress = 0.5f;
+        else if (step == Step.MeasureB)
+            progress = 0.5f + Math.Min(1, count / (float)NeedSamples) / 2;
         using (var b = new SolidBrush(CalUi.Grid))
             g.FillRectangle(b, 16, 236, w - 32, 12);
         using (var b = new SolidBrush(CalUi.Accent))
             g.FillRectangle(b, 16, 236, (w - 32) * progress, 12);
         using (var b = new SolidBrush(CalUi.Dim))
         using (var f = new Font("Segoe UI", 8.25F))
-            g.DrawString("Still: " + (int)(progress * 100) + "%", f, b, 16, 252);
+            g.DrawString("Progress: " + (int)(progress * 100) + "%", f, b, 16, 252);
     }
 
     protected override void Dispose(bool disposing)

@@ -239,6 +239,33 @@ namespace CppWinFormJoy
                     Check(wres == 0 && bytes_ok && form.CalText.Contains("motion"),
                         name + ": motion calibration saved with the factory sensitivities, status: " + form.CalText);
                 }
+                // Two positions on a tilted surface (+120/-80 on X/Y): turned 180 degrees, the tilt
+                // reverses and averages out, leaving the sensor's own offsets.
+                motion.TwoPositions = true;
+                fake.imu_raw = new short[] { -45 + 120, -43 - 80, 4096 + 341, 25, -35, -36 };
+                motion.Start();
+                bool turn_asked = pump_until(() => motion.Turning, 5000);
+                fake.imu_raw = new short[] { -45, -43, 4096 + 341, 25, -35, -36 + 2000 };  // Turning: ~140 deg/s
+                bool turned = pump_until(() => Math.Abs(motion.Turned) >= 180, 5000);
+                fake.imu_raw = new short[] { -45 - 120, -43 + 80, 4096 + 341, 25, -35, -36 };
+                bool measured2 = pump_until(() => motion.Measured, 5000);
+                fake.imu_raw = null;
+                int[] m2 = motion.Result;
+                motion.TwoPositions = false;
+                Check(turn_asked && turned && measured2 && m2 != null && string.Join(",", m2) == "-45,-43,341,25,-35,-36",
+                    name + ": two-position motion calibration cancels the surface tilt (" + (m2 == null ? "none" : string.Join(",", m2))
+                    + ", turned " + (int)Math.Abs(motion.Turned) + ")");
+
+                // Back to factory calibration
+                int f1 = sticks.UseFactory(false), f2 = motion.UseFactory(false);
+                int user_at = left_stick ? 0x8010 : 0x801B;
+                bool erased = true;
+                for (int i = 0; i < 11; i++)
+                    erased &= fake.spi[user_at + i] == 0xFF;
+                for (int i = 0; i < 26; i++)
+                    erased &= fake.spi[0x8026 + i] == 0xFF;
+                Check(f1 == 0 && f2 == 0 && erased && form.CalText == "Factory",
+                    name + ": Use factory erases the stick and motion user calibration, status: " + form.CalText);
                 form.select_cal_tab(2);
 
                 string file = "selftest_spi_dump.bin";

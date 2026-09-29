@@ -262,12 +262,13 @@ open the Calibration screen. The CLI's device info (2) shows the same.
 | Tab | What it does |
 |---|---|
 | Sticks | Guided stick calibration (Pro Controller: pick the stick). Click Start, let go of the stick (the circle shrinks while it holds still), then rotate it slowly along its edge, pushed all the way, until the whole ring lights up. Finish, then Save. |
-| Motion | Guided motion (6-axis) calibration, for drift. Lay the controller flat and still, buttons up (the bubble shows the tilt), click Start and don't touch it for ~2 seconds (it starts over if it moves). Save writes the measured gyro and accelerometer offsets with the factory sensitivities. |
+| Motion | Guided motion (6-axis) calibration, for drift. Lay the controller flat and still, buttons up (the bubble shows the tilt), click Start and don't touch it for ~2 seconds (it starts over if it moves). Save writes the measured gyro and accelerometer offsets with the factory sensitivities. **Two positions** (more accurate): after the first measurement, turn the controller 180° on the same surface, keeping it flat (the arc shows the turn, measured by the gyro), and let go for a second measurement. The surface's tilt reverses between the two and averages out of the accelerometer offsets. |
 | Manual | The original editor: user calibration values, stick device parameters, Refresh All / Write Cal. |
 
 The wizards read the controller only while measuring, and Save (after a confirmation)
 writes only what was measured: the other stick and the other calibration stay as they
-are. The CLI offers the guided stick calibration in menu 11 when you set a stick user
+are. **Use factory** (Sticks: the chosen stick; Motion) erases that user calibration, so
+the controller goes back to its factory calibration. The CLI offers the guided stick calibration in menu 11 when you set a stick user
 calibration.
 
 ## Link health (status bar, Linux only)
