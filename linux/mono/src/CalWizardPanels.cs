@@ -422,7 +422,9 @@ public unsafe class MotionCalPanel : Panel
     const int GyroMaxSpread = 40;    // Raw counts; a still Joy-Con varies by ~10
     const int AccMaxSpread = 150;
     const int OneG = 4096;           // Accelerometer at +-8G: 4096 counts per G
-    const double GyroDegPerCount = 0.070; // +-2000 dps range (nominal; 936 / 13371)
+    // +-2000 dps over the 16-bit range: 4000 / 65536. (936 / 13371 = 0.070, the scale jctool uses
+    // with the factory calibration, read a real 180 degree turn on a Joy-Con (R) as 205.)
+    const double GyroDegPerCount = 4000.0 / 65536;
     const double SampleSeconds = 0.005;   // 3 samples per 15ms report
     const double TurnTolerance = 25;      // Degrees around 180
 
