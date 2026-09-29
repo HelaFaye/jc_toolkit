@@ -122,7 +122,8 @@ namespace CppWinFormJoy
 
         public volatile int[] stick_raw;
         public volatile short[] imu_raw;
-        public readonly List<byte[]> rumbles = new List<byte[]>();  // Left rumble bytes of every report sent   // Raw 6-axis values in input reports (null: a test pattern)   // Raw 12-bit X, Y for both sticks in input reports (null: centered)
+        public readonly List<byte[]> rumbles = new List<byte[]>();  // Left rumble bytes of every report felt
+        public bool vibration;                                      // Subcommand 0x48 (enable vibration)   // Raw 6-axis values in input reports (null: a test pattern)   // Raw 12-bit X, Y for both sticks in input reports (null: centered)
         readonly System.Diagnostics.Stopwatch report_clock = System.Diagnostics.Stopwatch.StartNew();
         long last_report_ms;
 
@@ -150,7 +151,9 @@ namespace CppWinFormJoy
             byte cmd = data[0];
             if (cmd == 0x11)
                 return McuWrite(data, length);
-            if (cmd == 0x10 || cmd == 0x01)
+            if (cmd == 0x01 && data[10] == 0x48)
+                vibration = data[11] == 0x01;
+            if ((cmd == 0x10 || cmd == 0x01) && vibration)   // A real Joy-Con ignores rumble until then
                 lock (rumbles)
                     rumbles.Add(new[] { data[2], data[3], data[4], data[5] });
             if (cmd != 0x01)

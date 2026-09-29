@@ -258,6 +258,9 @@ public unsafe class MidiRumble : IDisposable
         if (running)
             return;
         lock (sync) { held.Clear(); sustained.Clear(); sustain = false; dirty = true; }
+        // The controller ignores rumble reports until vibration is enabled (like the
+        // HD Rumble Player does before playing a file)
+        CalUi.Subcommand(0x48, 0x01);
         running = true;
         thread = new Thread(run) { IsBackground = true, Name = "MIDI rumble" };
         thread.Start();
@@ -270,6 +273,7 @@ public unsafe class MidiRumble : IDisposable
         running = false;
         thread.Join(500);
         send(0, 0, 0, 0);
+        CalUi.Subcommand(0x48, 0x00);
         now_playing = "";
         high_note = low_note = -1;
     }
