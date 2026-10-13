@@ -21,7 +21,8 @@ android.api = 34
 android.minapi = 24
 android.archs = arm64-v8a, armeabi-v7a
 android.accept_sdk_license = True
-android.features = android.hardware.usb.host
+# uses-feature in the manifest (python-for-android develop dropped --feature, which android.features used)
+android.extra_manifest_xml = packaging/android/extra_manifest.xml
 android.manifest.intent_filters = packaging/android/usb_intent_filter.xml
 android.add_resources = packaging/android/device_filter.xml:xml/device_filter.xml
 android.allow_backup = True

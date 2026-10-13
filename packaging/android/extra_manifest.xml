@@ -1,0 +1,2 @@
+<!-- USB host (OTG): wanted, not required, so the app installs on devices without it too -->
+<uses-feature android:name="android.hardware.usb.host" android:required="false" />
