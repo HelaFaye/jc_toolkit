@@ -93,7 +93,10 @@ def android(mode="debug"):
     if sys.platform == "win32":
         sys.exit("Android builds need Linux or macOS (on Windows: WSL2, or the GitHub Actions workflow).")
     pip("buildozer", "cython<3.1", "setuptools")
-    buildozer = [os.path.join(os.path.dirname(sys.executable), "buildozer"), "android", mode]
+    bin_dir = os.path.dirname(sys.executable)
+    buildozer = [os.path.join(bin_dir, "buildozer"), "android", mode]
+    # buildozer looks for cython (and runs pip) from PATH: the venv's first
+    os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
     ndk = find_ndk()
     if ndk is None:
         # The first build downloads the SDK and NDK; then the helper, then the APK again
