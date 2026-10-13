@@ -1,0 +1,52 @@
+.PHONY: all clean interactive install uninstall help
+
+CXX := g++
+CXXFLAGS := -std=c++11 -Wall -Wextra -O2
+LDFLAGS := $(shell pkg-config --libs hidapi-hidraw)
+CPPFLAGS := $(shell pkg-config --cflags hidapi-hidraw)
+# jc_core.cpp is ported from jctool.cpp; keep its original expression style warning-free
+CORE_FLAGS := -Wno-parentheses -Wno-unused-variable -Wno-unused-but-set-variable
+
+# Named jctool-cli: the repository root already has a jctool/ folder (the Windows sources).
+TARGETS := jctool-cli
+OBJS := jctool_linux_interactive.o cli/jc_core.o cli/png.o
+
+all: $(TARGETS)
+
+jctool-cli: $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
+	@echo "[✓] Built $@"
+
+jctool_linux_interactive.o: jctool_linux_interactive.cpp cli/jc_core.h cli/png.h
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+cli/jc_core.o: cli/jc_core.cpp cli/jc_core.h jctool/ir_sensor.h jctool/luts.h jctool/tune.h
+	$(CXX) $(CXXFLAGS) $(CORE_FLAGS) $(CPPFLAGS) -c -o $@ $<
+
+cli/png.o: cli/png.cpp cli/png.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+interactive: jctool-cli
+	@echo "[*] Running interactive menu..."
+	./jctool-cli
+
+install: all
+	@echo "[*] Installing to /usr/local/bin..."
+	install -m 755 jctool-cli /usr/local/bin/
+	@echo "[✓] Installation complete"
+
+uninstall:
+	rm -f /usr/local/bin/jctool-cli
+	@echo "[✓] Uninstallation complete"
+
+clean:
+	rm -f $(TARGETS) $(OBJS)
+	@echo "[✓] Cleaned"
+
+help:
+	@echo "Joy-Con Toolkit (Linux CLI) - Make targets:"
+	@echo "  all         - Build jctool-cli (default)"
+	@echo "  interactive - Build and run the interactive menu"
+	@echo "  install     - Install jctool-cli to /usr/local/bin"
+	@echo "  uninstall   - Remove it from /usr/local/bin"
+	@echo "  clean       - Remove build output"

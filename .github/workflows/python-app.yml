@@ -1,0 +1,125 @@
+# Joy-Con Toolkit, Python / Kivy app: tests, then builds for Linux, Windows, macOS and Android.
+# The builds are attached to each run (Actions > run > Artifacts); a tag v* also publishes
+# them as a GitHub release.
+name: Python app
+
+on:
+  push:
+    paths: ["python/**", ".github/workflows/python-app.yml"]
+    tags: ["v*"]
+  pull_request:
+    paths: ["python/**", ".github/workflows/python-app.yml"]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: python
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: System packages (virtual display for the app's self-test)
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri libmtdev1
+      - name: Venv
+        run: scripts/setup_venv.sh
+      - name: Tests
+        run: .venv/bin/python -m pytest -v
+
+  desktop:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04        # Oldest glibc: the build runs on newer distributions too
+            name: linux
+          - os: windows-latest
+            name: windows
+          - os: macos-latest        # Apple Silicon
+            name: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Venv (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: scripts\setup_venv.bat
+      - name: Venv
+        if: runner.os != 'Windows'
+        run: scripts/setup_venv.sh
+      - name: Tests (protocol and features)
+        if: runner.os != 'Linux'
+        env:
+          JCTOOL_SKIP_GUI_TEST: "1"
+        run: ${{ runner.os == 'Windows' && '.venv\Scripts\python' || '.venv/bin/python' }} -m pytest
+      - name: Build
+        run: ${{ runner.os == 'Windows' && '.venv\Scripts\python' || '.venv/bin/python' }} scripts/build.py desktop
+      - name: Self-test the build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y xvfb libgl1-mesa-dri libmtdev1
+          xvfb-run -a -s "-screen 0 1100x800x24" dist/JoyConToolkit/JoyConToolkit --selftest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JoyConToolkit-${{ matrix.name }}
+          path: |
+            python/dist/*.zip
+            python/dist/*.tar.gz
+
+  android:
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: System packages (python-for-android)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev \
+            libncurses-dev cmake libffi-dev libssl-dev
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            python/.buildozer
+          key: buildozer-${{ hashFiles('python/buildozer.spec') }}
+      - name: Venv
+        run: python -m venv .venv
+      - name: Build the APK
+        run: .venv/bin/python scripts/build.py android
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JoyConToolkit-android
+          path: python/bin/*.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*

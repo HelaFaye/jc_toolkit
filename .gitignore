@@ -286,3 +286,20 @@ __pycache__/
 *.btm.cs
 *.odx.cs
 *.xsd.cs
+jctool-cli
+jctool_linux_interactive.o
+cli/*.o
+
+# Local development
+.vscode/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+python/.venv/
+python/dist/
+python/.buildozer/
+python/*.egg-info/
+python/jctool/native/
+run.txt
+python/traffic_log.txt

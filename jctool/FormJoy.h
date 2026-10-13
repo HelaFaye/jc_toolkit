@@ -275,6 +275,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
     private: System::Windows::Forms::RadioButton^  radioBtn_IR60p;
     private: System::Windows::Forms::RadioButton^  radioBtn_IR120p;
     private: System::Windows::Forms::RadioButton^  radioBtn_IR240p;
+    private: System::Windows::Forms::GroupBox^ grpBox_IRMode;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModeCapture;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModeClustering;
+    private: System::Windows::Forms::RadioButton^ radioBtn_IRModePointing;
     private: System::Windows::Forms::TrackBar^  trackBar_IRGain;
     private: System::Windows::Forms::CheckBox^  chkBox_IRDimLeds;
     private: System::Windows::Forms::CheckBox^  chkBox_IRBrightLeds;
@@ -359,6 +363,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
     private: System::Windows::Forms::Label^  lbl_mainStickHelp;
     private: System::Windows::Forms::NumericUpDown^  numeric_StickParamRangeRatio2;
     private: System::Windows::Forms::NumericUpDown^  numeric_StickParamDeadzone2;
+    private: System::Windows::Forms::ToolStripDropDownButton^ dropDown_controllerPrioritySelection;
+    private: System::Windows::Forms::ToolStripMenuItem^ anyToolStripMenuItem;
+    private: System::Windows::Forms::ToolStripMenuItem^ joyConLToolStripMenuItem;
+    private: System::Windows::Forms::ToolStripMenuItem^ joyConRToolStripMenuItem;
+    private: System::Windows::Forms::ToolStripMenuItem^ proControllerToolStripMenuItem;
     public:  System::Windows::Forms::TextBox^  txtBox_NFCTag;
 
     private: System::ComponentModel::ComponentResourceManager^  resources = (gcnew System::ComponentModel::ComponentResourceManager(images::typeid));
@@ -516,6 +525,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR60p = (gcnew System::Windows::Forms::RadioButton());
             this->radioBtn_IR120p = (gcnew System::Windows::Forms::RadioButton());
             this->radioBtn_IR240p = (gcnew System::Windows::Forms::RadioButton());
+            this->grpBox_IRMode = (gcnew System::Windows::Forms::GroupBox());
+            this->radioBtn_IRModeCapture = (gcnew System::Windows::Forms::RadioButton());
+            this->radioBtn_IRModeClustering = (gcnew System::Windows::Forms::RadioButton());
+            this->radioBtn_IRModePointing = (gcnew System::Windows::Forms::RadioButton());
             this->grpBox_nfc = (gcnew System::Windows::Forms::GroupBox());
             this->txtBox_NFCTag = (gcnew System::Windows::Forms::TextBox());
             this->txtBox_nfcUid = (gcnew System::Windows::Forms::TextBox());
@@ -581,6 +594,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->numeric_StickParamRangeRatio = (gcnew System::Windows::Forms::NumericUpDown());
             this->lbl_deadzone = (gcnew System::Windows::Forms::Label());
             this->numeric_StickParamDeadzone = (gcnew System::Windows::Forms::NumericUpDown());
+            this->dropDown_controllerPrioritySelection = (gcnew System::Windows::Forms::ToolStripDropDownButton());
+            this->proControllerToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
+            this->joyConRToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
+            this->joyConLToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
+            this->anyToolStripMenuItem = (gcnew System::Windows::Forms::ToolStripMenuItem());
             this->grpBox_Color->SuspendLayout();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->pictureBoxPreview))->BeginInit();
             this->grpBox_SPI->SuspendLayout();
@@ -611,6 +629,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_IRCustomRegAddr))->BeginInit();
             this->grpBox_IRColorize->SuspendLayout();
             this->grpBox_IRRes->SuspendLayout();
+            this->grpBox_IRMode->SuspendLayout();
             this->grpBox_nfc->SuspendLayout();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_plus))->BeginInit();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_center))->BeginInit();
@@ -2359,9 +2378,9 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->toolStrip1->Dock = System::Windows::Forms::DockStyle::Bottom;
             this->toolStrip1->GripMargin = System::Windows::Forms::Padding(0);
             this->toolStrip1->GripStyle = System::Windows::Forms::ToolStripGripStyle::Hidden;
-            this->toolStrip1->Items->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(5) {
+            this->toolStrip1->Items->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(6) {
                 this->toolStripBtn_batt,
-                    this->toolStripLabel_batt, this->toolStripLabel_temp, this->toolStripBtn_refresh, this->toolStripBtn_Disconnect
+                    this->toolStripLabel_batt, this->toolStripLabel_temp, this->toolStripBtn_refresh, this->toolStripBtn_Disconnect, this->dropDown_controllerPrioritySelection
             });
             this->toolStrip1->Location = System::Drawing::Point(0, 1065);
             this->toolStrip1->Name = L"toolStrip1";
@@ -2429,8 +2448,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->toolStripBtn_refresh->Padding = System::Windows::Forms::Padding(4, 0, 4, 0);
             this->toolStripBtn_refresh->Size = System::Drawing::Size(64, 21);
             this->toolStripBtn_refresh->Text = L"Refresh";
-            this->toolStripBtn_refresh->ToolTipText = L"Refresh connected controller info.\r\n\r\nIf you connected a new controller and disco"
-                L"nnected the old one,\r\nit will show the new controller.";
+            this->toolStripBtn_refresh->ToolTipText = L"Refresh connected controller info.";
             this->toolStripBtn_refresh->Click += gcnew System::EventHandler(this, &FormJoy::toolStripBtn_refresh_Click);
             // 
             // toolStripBtn_Disconnect
@@ -2651,9 +2669,9 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRColorize->FlatStyle = System::Windows::Forms::FlatStyle::Flat;
             this->grpBox_IRColorize->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(9)), static_cast<System::Int32>(static_cast<System::Byte>(255)),
                 static_cast<System::Int32>(static_cast<System::Byte>(206)));
-            this->grpBox_IRColorize->Location = System::Drawing::Point(138, 20);
+            this->grpBox_IRColorize->Location = System::Drawing::Point(88/*138*/, 20);
             this->grpBox_IRColorize->Name = L"grpBox_IRColorize";
-            this->grpBox_IRColorize->Size = System::Drawing::Size(125, 130);
+            this->grpBox_IRColorize->Size = System::Drawing::Size(95/*125*/, 130);
             this->grpBox_IRColorize->TabIndex = 4;
             this->grpBox_IRColorize->TabStop = false;
             this->grpBox_IRColorize->Text = L"Colorize";
@@ -2690,7 +2708,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IRColorGreen->Name = L"radioBtn_IRColorGreen";
             this->radioBtn_IRColorGreen->Size = System::Drawing::Size(95, 21);
             this->radioBtn_IRColorGreen->TabIndex = 2;
-            this->radioBtn_IRColorGreen->Text = L"Night vision";
+            this->radioBtn_IRColorGreen->Text = L"Night vis";
             this->radioBtn_IRColorGreen->UseVisualStyleBackColor = false;
             // 
             // radioBtn_IRColorRed
@@ -2740,7 +2758,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->chkBox_IRDimLeds->RightToLeft = System::Windows::Forms::RightToLeft::No;
             this->chkBox_IRDimLeds->Size = System::Drawing::Size(195, 21);
             this->chkBox_IRDimLeds->TabIndex = 27;
-            this->chkBox_IRDimLeds->Text = L"Near/Wide  (130°)  Leds 3/4";
+            this->chkBox_IRDimLeds->Text = L"Near/Wide  (130Â°)  Leds 3/4";
             // 
             // chkBox_IRBrightLeds
             // 
@@ -2756,7 +2774,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->chkBox_IRBrightLeds->RightToLeft = System::Windows::Forms::RightToLeft::No;
             this->chkBox_IRBrightLeds->Size = System::Drawing::Size(195, 21);
             this->chkBox_IRBrightLeds->TabIndex = 26;
-            this->chkBox_IRBrightLeds->Text = L"Far/Narrow   (75°)  Leds 1/2";
+            this->chkBox_IRBrightLeds->Text = L"Far/Narrow   (75Â°)  Leds 1/2";
             // 
             // grpBox_IRRes
             // 
@@ -2769,7 +2787,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 static_cast<System::Int32>(static_cast<System::Byte>(206)));
             this->grpBox_IRRes->Location = System::Drawing::Point(10, 20);
             this->grpBox_IRRes->Name = L"grpBox_IRRes";
-            this->grpBox_IRRes->Size = System::Drawing::Size(125, 130);
+            this->grpBox_IRRes->Size = System::Drawing::Size(85/*125*/, 130);
             this->grpBox_IRRes->TabIndex = 3;
             this->grpBox_IRRes->TabStop = false;
             this->grpBox_IRRes->Text = L"Resolution";
@@ -2789,7 +2807,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR30p->Name = L"radioBtn_IR30p";
             this->radioBtn_IR30p->Size = System::Drawing::Size(68, 21);
             this->radioBtn_IR30p->TabIndex = 3;
-            this->radioBtn_IR30p->Text = L"30 x 40";
+            this->radioBtn_IR30p->Text = L"30x40";
             this->radioBtn_IR30p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR30p->UseVisualStyleBackColor = false;
             // 
@@ -2808,7 +2826,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR60p->Name = L"radioBtn_IR60p";
             this->radioBtn_IR60p->Size = System::Drawing::Size(68, 21);
             this->radioBtn_IR60p->TabIndex = 2;
-            this->radioBtn_IR60p->Text = L"60 x 80";
+            this->radioBtn_IR60p->Text = L"60x80";
             this->radioBtn_IR60p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR60p->UseVisualStyleBackColor = false;
             // 
@@ -2827,7 +2845,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR120p->Name = L"radioBtn_IR120p";
             this->radioBtn_IR120p->Size = System::Drawing::Size(82, 21);
             this->radioBtn_IR120p->TabIndex = 1;
-            this->radioBtn_IR120p->Text = L"120 x 160";
+            this->radioBtn_IR120p->Text = L"120x160";
             this->radioBtn_IR120p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR120p->UseVisualStyleBackColor = false;
             // 
@@ -2849,9 +2867,81 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->radioBtn_IR240p->Size = System::Drawing::Size(82, 21);
             this->radioBtn_IR240p->TabIndex = 0;
             this->radioBtn_IR240p->TabStop = true;
-            this->radioBtn_IR240p->Text = L"240 x 320";
+            this->radioBtn_IR240p->Text = L"240x320";
             this->radioBtn_IR240p->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             this->radioBtn_IR240p->UseVisualStyleBackColor = false;
+            // 
+            // grpBox_IRMode
+            // 
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModeCapture);
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModeClustering);
+            this->grpBox_IRMode->Controls->Add(this->radioBtn_IRModePointing);
+            this->grpBox_IRMode->FlatStyle = System::Windows::Forms::FlatStyle::Flat;
+            this->grpBox_IRMode->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(9)), static_cast<System::Int32>(static_cast<System::Byte>(255)),
+                static_cast<System::Int32>(static_cast<System::Byte>(206)));
+            this->grpBox_IRMode->Location = System::Drawing::Point(175, 20);
+            this->grpBox_IRMode->Name = L"grpBox_IRMode";
+            this->grpBox_IRMode->Size = System::Drawing::Size(95, 130);
+            this->grpBox_IRMode->TabIndex = 4;
+            this->grpBox_IRMode->TabStop = false;
+            this->grpBox_IRMode->Text = L"Mode";
+            // 
+            // radioBtn_IRModeCapture
+            // 
+            this->radioBtn_IRModeCapture->AutoSize = true;
+            this->radioBtn_IRModeCapture->Checked = true;
+            this->radioBtn_IRModeCapture->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModeCapture->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModeCapture->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModeCapture->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModeCapture->Location = System::Drawing::Point(10, 21);
+            this->radioBtn_IRModeCapture->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModeCapture->Name = L"radioBtn_IRModeCapture";
+            this->radioBtn_IRModeCapture->Size = System::Drawing::Size(68, 21);
+            this->radioBtn_IRModeCapture->TabIndex = 3;
+            this->radioBtn_IRModeCapture->Text = L"Capture";
+            this->radioBtn_IRModeCapture->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+            this->radioBtn_IRModeCapture->UseVisualStyleBackColor = false;
+            // 
+            // radioBtn_IRModeClustering
+            // 
+            this->radioBtn_IRModeClustering->AutoSize = true;
+            this->radioBtn_IRModeClustering->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModeClustering->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModeClustering->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModeClustering->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModeClustering->Location = System::Drawing::Point(10, 75);
+            this->radioBtn_IRModeClustering->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModeClustering->Name = L"radioBtn_IRModeClustering";
+            this->radioBtn_IRModeClustering->Size = System::Drawing::Size(68, 21);
+            this->radioBtn_IRModeClustering->TabIndex = 2;
+            this->radioBtn_IRModeClustering->Text = L"Cluster";
+            this->radioBtn_IRModeClustering->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
+            this->radioBtn_IRModeClustering->UseVisualStyleBackColor = false;
+            // 
+            // radioBtn_IRModePointing
+            // 
+            this->radioBtn_IRModePointing->AutoSize = true;
+            this->radioBtn_IRModePointing->BackColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(70)), static_cast<System::Int32>(static_cast<System::Byte>(70)),
+                static_cast<System::Int32>(static_cast<System::Byte>(70)));
+            this->radioBtn_IRModePointing->FlatAppearance->BorderSize = 0;
+            this->radioBtn_IRModePointing->Font = (gcnew System::Drawing::Font(L"Segoe UI", 9.75F, System::Drawing::FontStyle::Regular, System::Drawing::GraphicsUnit::Point,
+                static_cast<System::Byte>(161)));
+            this->radioBtn_IRModePointing->ForeColor = System::Drawing::Color::FromArgb(static_cast<System::Int32>(static_cast<System::Byte>(255)), static_cast<System::Int32>(static_cast<System::Byte>(188)),
+                static_cast<System::Int32>(static_cast<System::Byte>(0)));
+            this->radioBtn_IRModePointing->Location = System::Drawing::Point(10, 48);
+            this->radioBtn_IRModePointing->Margin = System::Windows::Forms::Padding(0);
+            this->radioBtn_IRModePointing->Name = L"radioBtn_IRModePointing";
+            this->radioBtn_IRModePointing->Size = System::Drawing::Size(82, 21);
+            this->radioBtn_IRModePointing->TabIndex = 1;
+            this->radioBtn_IRModePointing->Text = L"Pointing";
+            this->radioBtn_IRModePointing->TextAlign = System::Drawing::ContentAlignment::MiddleCenter;
             // 
             // grpBox_nfc
             // 
@@ -3287,6 +3377,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRSettings->Controls->Add(this->btn_IRConfigLive);
             this->grpBox_IRSettings->Controls->Add(this->grpBox_IRRes);
             this->grpBox_IRSettings->Controls->Add(this->grpBox_IRColorize);
+            this->grpBox_IRSettings->Controls->Add(this->grpBox_IRMode);
             this->grpBox_IRSettings->Controls->Add(this->numeric_IRCustomRegVal);
             this->grpBox_IRSettings->Controls->Add(this->numeric_IRCustomRegAddr);
             this->grpBox_IRSettings->Controls->Add(this->lbl_exposure);
@@ -3918,6 +4009,45 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->numeric_StickParamDeadzone->TextAlign = System::Windows::Forms::HorizontalAlignment::Center;
             this->numeric_StickParamDeadzone->UpDownAlign = System::Windows::Forms::LeftRightAlignment::Left;
             // 
+            // dropDown_controllerPrioritySelection
+            // 
+            this->dropDown_controllerPrioritySelection->Alignment = System::Windows::Forms::ToolStripItemAlignment::Right;
+            this->dropDown_controllerPrioritySelection->DropDownItems->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(4) {
+                this->anyToolStripMenuItem,
+                    this->joyConLToolStripMenuItem, this->joyConRToolStripMenuItem, this->proControllerToolStripMenuItem
+            });
+            this->dropDown_controllerPrioritySelection->Name = L"dropDown_controllerPrioritySelection";
+            this->dropDown_controllerPrioritySelection->Size = System::Drawing::Size(73, 19);
+            this->dropDown_controllerPrioritySelection->Text = L"Any";
+            // 
+            // proControllerToolStripMenuItem
+            // 
+            this->proControllerToolStripMenuItem->Name = L"proControllerToolStripMenuItem";
+            this->proControllerToolStripMenuItem->Size = System::Drawing::Size(180, 22);
+            this->proControllerToolStripMenuItem->Text = L"Pro Controller";
+            this->proControllerToolStripMenuItem->Click += gcnew System::EventHandler(this, &FormJoy::proControllerToolStripMenuItem_Click);
+            // 
+            // joyConRToolStripMenuItem
+            // 
+            this->joyConRToolStripMenuItem->Name = L"joyConRToolStripMenuItem";
+            this->joyConRToolStripMenuItem->Size = System::Drawing::Size(180, 22);
+            this->joyConRToolStripMenuItem->Text = L"Joy-Con (R)";
+            this->joyConRToolStripMenuItem->Click += gcnew System::EventHandler(this, &FormJoy::joyConRToolStripMenuItem_Click);
+            // 
+            // joyConLToolStripMenuItem
+            // 
+            this->joyConLToolStripMenuItem->Name = L"joyConLToolStripMenuItem";
+            this->joyConLToolStripMenuItem->Size = System::Drawing::Size(180, 22);
+            this->joyConLToolStripMenuItem->Text = L"Joy-Con (L)";
+            this->joyConLToolStripMenuItem->Click += gcnew System::EventHandler(this, &FormJoy::joyConLToolStripMenuItem_Click);
+            // 
+            // anyToolStripMenuItem
+            // 
+            this->anyToolStripMenuItem->Name = L"anyToolStripMenuItem";
+            this->anyToolStripMenuItem->Size = System::Drawing::Size(180, 22);
+            this->anyToolStripMenuItem->Text = L"Any";
+            this->anyToolStripMenuItem->Click += gcnew System::EventHandler(this, &FormJoy::anyToolStripMenuItem_Click);
+            // 
             // FormJoy
             // 
             this->AutoScaleDimensions = System::Drawing::SizeF(96, 96);
@@ -4013,6 +4143,8 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->grpBox_IRColorize->PerformLayout();
             this->grpBox_IRRes->ResumeLayout(false);
             this->grpBox_IRRes->PerformLayout();
+            this->grpBox_IRMode->ResumeLayout(false);
+            this->grpBox_IRMode->PerformLayout();
             this->grpBox_nfc->ResumeLayout(false);
             this->grpBox_nfc->PerformLayout();
             (cli::safe_cast<System::ComponentModel::ISupportInitialize^>(this->numeric_leftUserCal_y_plus))->EndInit();
@@ -4080,7 +4212,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         this->btn_runBtnTest->Text = L"Turn on";
         enable_button_test = false;
 
-        if (handle_ok != 3) {
+        if (handle_type != PROCON) {
             this->textBoxSN->Text = gcnew String(get_sn(0x6001, 0xF).c_str());
             this->textBox_chg_sn->Text = this->textBoxSN->Text;
 
@@ -4093,8 +4225,8 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->btn_changeGripsColor->Enabled = true;
         }
 
-        if (handle_ok != 1) {
-            if (handle_ok == 2)
+        if (handle_type != JOYCON_L) {
+            if (handle_type == JOYCON_R)
                 this->iRCameraToolStripMenuItem->Enabled = true;  // JC (R)
             else
                 this->iRCameraToolStripMenuItem->Enabled = false; // Pro con
@@ -4114,11 +4246,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
         this->textBoxMAC->Text = String::Format("{0:X2}:{1:X2}:{2:X2}:{3:X2}:{4:X2}:{5:X2}",
             device_info[4], device_info[5], device_info[6], device_info[7], device_info[8], device_info[9]);
 
-        if (handle_ok == 1)
+        if (handle_type == JOYCON_L)
             this->textBoxDev->Text = L"Joy-Con (L)";
-        else if (handle_ok == 2)
+        else if (handle_type == JOYCON_R)
             this->textBoxDev->Text = L"Joy-Con (R)";
-        else if (handle_ok == 3)
+        else if (handle_type == PROCON)
             this->textBoxDev->Text = L"Pro Controller";
 
         update_battery();
@@ -4155,7 +4287,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             newColors[10] = (u8)jcGripRightColor.G;
             newColors[11] = (u8)jcGripRightColor.B;
 
-            if (handle_ok != 3)
+            if (handle_type != PROCON)
                 error = write_spi_data(0x6050, 6, newColors);
             else
                 error = write_spi_data(0x6050, 12, newColors);
@@ -4191,11 +4323,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
         get_device_info(device_info);
 
         String^ filename = L"spi_";
-        if (handle_ok == 1)
+        if (handle_type == JOYCON_L)
             filename += "left_";
-        else if (handle_ok == 2)
+        else if (handle_type == JOYCON_R)
             filename += "right_";
-        else if (handle_ok == 3)
+        else if (handle_type == PROCON)
             filename += "pro_";
 
         filename += String::Format("{0:X2}{1:X2}{2:X2}{3:X2}{4:X2}{5:X2}",
@@ -4250,14 +4382,14 @@ public ref class FormJoy : public System::Windows::Forms::Form
         Bitmap^ MyImageLayer2;
 
         // Apply body color 
-        switch (handle_ok) {
-            case 1:
+        switch (handle_type) {
+            case JOYCON_L:
                 MyImage = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_l_joy_body")));
                 break;
-            case 2:
+            case JOYCON_R:
                 MyImage = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_r_joy_body")));
                 break;
-            case 3:
+            case PROCON:
                 MyImage = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_pro_body")));
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_pro_grips_l")));
                 MyImageLayer2 = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_pro_grips_r")));
@@ -4283,7 +4415,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         delete bmd;
 
         // Apply grips color
-        if (handle_ok == 3) {
+        if (handle_type == PROCON) {
             // Skip slow SetPixel(). Reduce latency pixel set latency from 842us -> 260ns.
             bmd = MyImageLayer->LockBits(System::Drawing::Rectangle(0, 0, MyImageLayer->Width, MyImageLayer->Height), System::Drawing::Imaging::ImageLockMode::ReadOnly, MyImageLayer->PixelFormat);
             System::Drawing::Imaging::BitmapData^ bmd2 = MyImageLayer2->LockBits(System::Drawing::Rectangle(0, 0, MyImageLayer2->Width, MyImageLayer2->Height), System::Drawing::Imaging::ImageLockMode::ReadOnly, MyImageLayer2->PixelFormat);
@@ -4349,14 +4481,14 @@ public ref class FormJoy : public System::Windows::Forms::Form
         }
 
         // Apply buttons color 
-        switch (handle_ok) {
-            case 1:
+        switch (handle_type) {
+            case JOYCON_L:
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_l_joy_buttons")));
                 break;
-            case 2:
+            case JOYCON_R:
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_r_joy_buttons")));
                 break;
-            case 3:
+            case PROCON:
                 MyImage = drawLayeredImage(MyImage, MyImageLayer); // Apply grips layer
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_pro_buttons")));
                 break;
@@ -4379,14 +4511,14 @@ public ref class FormJoy : public System::Windows::Forms::Form
         MyImage = drawLayeredImage(MyImage, MyImageLayer);
 
         // Apply outlines
-        switch (handle_ok) {
-            case 1:
+        switch (handle_type) {
+            case JOYCON_L:
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_l_joy_lines")));
                 break;
-            case 2:
+            case JOYCON_R:
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_r_joy_lines")));
                 break;
-            case 3:
+            case PROCON:
                 MyImageLayer = (cli::safe_cast<System::Drawing::Bitmap^>(resources->GetObject(L"base64_pro_lines")));
                 break;
             default:
@@ -4829,7 +4961,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         //Bootloader, device type, FW DS1, FW DS2
         array<byte>^ validation_magic = { 
             0x01, 0x08, 0x00, 0xF0, 0x00, 0x00, 0x62, 0x08, 0xC0, 0x5D, 0x89, 0xFD, 0x04, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0x40, 0x06,
-            (u8)handle_ok, 0xA0,
+            (u8)handle_type, 0xA0,
             0x0A, 0xFB, 0x00, 0x00, 0x02, 0x0D,
             0xAA, 0x55, 0xF0, 0x0F, 0x68, 0xE5, 0x97, 0xD2 };
         Stream^ fileStream;
@@ -4863,11 +4995,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 return;
             }
 
-            if (handle_ok == 1)
+            if (handle_type == JOYCON_L)
                 str_dev_type = L"Joy-Con (L)";
-            else if (handle_ok == 2)
+            else if (handle_type == JOYCON_R)
                 str_dev_type = L"Joy-Con (R)";
-            else if (handle_ok == 3)
+            else if (handle_type == PROCON)
                 str_dev_type = L"Pro controller";
 
             if (this->backup_spi[0x6012] == 1)
@@ -5026,16 +5158,16 @@ public ref class FormJoy : public System::Windows::Forms::Form
             this->lbl_rstDesc->Text =
                 L"This lets you restore the chosen user calibrations from your SPI backup.";
             this->grpBox_RstUser->Visible = true;
-            if (handle_ok == 1) {
+            if (handle_type == JOYCON_L) {
                 this->checkBox_rst_R_StickCal->Visible  = false;
                 this->checkBox_rst_L_StickCal->Visible  = true;
                 this->checkBox_rst_L_StickCal->Location = this->checkBox_rst_R_StickCal->Location;
             }
-            else if (handle_ok == 2) {
+            else if (handle_type == JOYCON_R) {
                 this->checkBox_rst_R_StickCal->Visible = true;
                 this->checkBox_rst_L_StickCal->Visible = false;
             }
-            else if (handle_ok == 3) {
+            else if (handle_type == PROCON) {
                 this->checkBox_rst_R_StickCal->Visible = true;
                 this->checkBox_rst_L_StickCal->Visible = true;
             }
@@ -5047,16 +5179,16 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 L"This option does the same factory reset with the option inside Switch's controller calibration menu.";
             this->btn_restore->Text = L"Reset";
             this->grpBox_RstUser->Visible = true;
-            if (handle_ok == 1) {
+            if (handle_type == JOYCON_L) {
                 this->checkBox_rst_R_StickCal->Visible  = false;
                 this->checkBox_rst_L_StickCal->Visible  = true;
                 this->checkBox_rst_L_StickCal->Location = this->checkBox_rst_R_StickCal->Location;
             }
-            else if (handle_ok == 2) {
+            else if (handle_type == JOYCON_R) {
                 this->checkBox_rst_R_StickCal->Visible = true;
                 this->checkBox_rst_L_StickCal->Visible = false;
             }
-            else if (handle_ok == 3) {
+            else if (handle_type == PROCON) {
                 this->checkBox_rst_R_StickCal->Visible = true;
                 this->checkBox_rst_L_StickCal->Visible = true;
             }
@@ -5115,7 +5247,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 send_rumble();
                 if (error == 0) {
                     String^ new_sn;
-                    if (handle_ok != 3) {
+                    if (handle_type != 3) {
                         new_sn = gcnew String(get_sn(0x6001, 0xF).c_str());
                         MessageBox::Show(L"The serial number was restored and changed to \"" + new_sn + L"\"!",
                             L"Restore Finished!", MessageBoxButtons::OK, MessageBoxIcon::Asterisk);
@@ -5148,10 +5280,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
                     sensor[i] = this->backup_spi[0x8026 + i];
                 }
 
-                if (handle_ok != 2 && this->checkBox_rst_L_StickCal->Checked == true)
+                if (handle_type != 2 && this->checkBox_rst_L_StickCal->Checked == true)
                     error = write_spi_data(0x8010, 0xB, l_stick);
                 Sleep(100);
-                if (handle_ok != 1 && this->checkBox_rst_R_StickCal->Checked == true && error == 0)
+                if (handle_type != 1 && this->checkBox_rst_R_StickCal->Checked == true && error == 0)
                     error = write_spi_data(0x801B, 0xB, r_stick);
                 Sleep(100);
                 if (this->checkBox_rst_accGyroCal->Checked == true && error == 0)
@@ -5176,10 +5308,10 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 unsigned char sensor[0x1A];
                 memset(sensor, 0xFF, 0x1A);
 
-                if (handle_ok != 2 && this->checkBox_rst_L_StickCal->Checked == true)
+                if (handle_type != 2 && this->checkBox_rst_L_StickCal->Checked == true)
                     error = write_spi_data(0x8010, 0xB, l_stick);
                 Sleep(100);
-                if (handle_ok != 1 && this->checkBox_rst_R_StickCal->Checked == true && error == 0)
+                if (handle_type != 1 && this->checkBox_rst_R_StickCal->Checked == true && error == 0)
                     error = write_spi_data(0x801B, 0xB, r_stick);
                 Sleep(100);
                 if (this->checkBox_rst_accGyroCal->Checked == true && error == 0)
@@ -5443,7 +5575,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         if (check_if_connected())
             return;
 
-        if (handle_ok != 3) {
+        if (handle_type != 3) {
             if (MessageBox::Show(L"This will change your Serial Number!\n\nMake a backup first!\n\n" +
                 L"Are you sure you want to continue?", L"Warning!",
                 MessageBoxButtons::YesNo, MessageBoxIcon::Warning) == System::Windows::Forms::DialogResult::Yes)
@@ -5508,7 +5640,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         if (check_if_connected())
             return;
 
-        if (handle_ok != 3) {
+        if (handle_type != 3) {
             if (MessageBox::Show(L"Do you really want to restore it from the S/N backup inside your controller\'s SPI?\n\nYou can also choose to restore it from a SPI backup you previously made, through the main Restore option.",
                 L"Warning!", MessageBoxButtons::YesNo, MessageBoxIcon::Warning) == System::Windows::Forms::DialogResult::Yes) {
                 int sn_ok = 1;
@@ -6098,7 +6230,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         this->lbl_IRStatus->Text = "Status: Configuring";
         Application::DoEvents();
 
-        // The IR camera lens has a FoV of 123°. The IR filter is a NIR 850nm wavelength pass filter.
+        // The IR camera lens has a FoV of 123ï¿½. The IR filter is a NIR 850nm wavelength pass filter.
 
         // Resolution config register and no of packets expected
         // The sensor supports a max of Binning [4 x 2] and max Skipping [4 x 4]
@@ -6129,6 +6261,20 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 ir_new_config.ir_res_reg = 0b01101001; // Sensor Binning [4 x 2] and Skipping [2 x 4]
                 ir_max_frag_no  = 0x03;
             }
+
+            if (this->radioBtn_IRModeCapture->Checked) {
+                ir_new_config.ir_mode = 0x07;
+            }
+            else if (this->radioBtn_IRModePointing->Checked) {
+                ir_new_config.ir_mode = 0x04;
+                ir_image_width = 320;
+                ir_image_height = 240;
+            }
+            else if (this->radioBtn_IRModeClustering->Checked) {
+                ir_new_config.ir_mode = 0x06;
+                ir_image_width = 320;
+                ir_image_height = 240;
+            }
             else {
                 return 8;
             }
@@ -6136,11 +6282,11 @@ public ref class FormJoy : public System::Windows::Forms::Form
 
         // Enable IR Leds. Only the following configurations are supported.
         if (this->chkBox_IRBrightLeds->Checked == true && this->chkBox_IRDimLeds->Checked == true)
-            ir_new_config.ir_leds = 0b000000; // Both Far/Narrow 75° and Near/Wide 130° Led groups are enabled.
+            ir_new_config.ir_leds = 0b000000; // Both Far/Narrow 75\u00B0 and Near/Wide 130\u00B0 Led groups are enabled.
         else if (this->chkBox_IRBrightLeds->Checked == true && this->chkBox_IRDimLeds->Checked == false)
-            ir_new_config.ir_leds = 0b100000; // Only Far/Narrow 75° Led group is enabled.
+            ir_new_config.ir_leds = 0b100000; // Only Far/Narrow 75\u00B0 Led group is enabled.
         else if (this->chkBox_IRBrightLeds->Checked == false && this->chkBox_IRDimLeds->Checked == true)
-            ir_new_config.ir_leds = 0b010000; // Only Near/Wide 130° Led group is enabled.
+            ir_new_config.ir_leds = 0b010000; // Only Near/Wide 130ï¿½ Led group is enabled.
         else if (this->chkBox_IRBrightLeds->Checked == false && this->chkBox_IRDimLeds->Checked == false)
             ir_new_config.ir_leds = 0b110000; // Both groups disabled
 
@@ -6289,9 +6435,9 @@ public ref class FormJoy : public System::Windows::Forms::Form
         graphicsHandle->InterpolationMode = System::Drawing::Drawing2D::InterpolationMode::HighQualityBicubic;
         graphicsHandle->DrawImage(rotatedImage, 0, 0, 240, 320);
 
-        this->pictureBoxIR->Image = resizedImage;
         this->pictureBoxIR->ClientSize = System::Drawing::Size(240, 320);
-        this->AutoScaleDimensions = System::Drawing::SizeF(96, 96);
+        this->pictureBoxIR->Image = resizedImage;
+        //this->AutoScaleDimensions = System::Drawing::SizeF(96, 96);
     }
 
     private: System::Void btn_getImage_Click(System::Object^  sender, System::EventArgs^  e) {
@@ -6418,13 +6564,13 @@ public ref class FormJoy : public System::Windows::Forms::Form
         get_spi_data(0x8026, sizeof(user_sensor_cal), user_sensor_cal);
         Sleep(100);
         get_spi_data(0x6089, sizeof(stick_model_main_left), stick_model_main_left);
-        if (handle_ok == 3) {
+        if (handle_type == PROCON) {
             Sleep(100);
             get_spi_data(0x609B, sizeof(stick_model_pro_right), stick_model_pro_right);
         }
 
         // Left stick user cal
-        if (handle_ok != 2) {
+        if (handle_type != 2) {
             if (*(u16*)&user_stick_cal[0] == 0xA1B2) {
                 // Center X,Y
                 decode_stick_params(decoded_stick_pair + 2, user_stick_cal + 5);
@@ -6451,7 +6597,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         else
             grpBox_leftStickUCal->Enabled = false;
         // Right stick user cal
-        if (handle_ok != 1) {
+        if (handle_type != 1) {
             if (*(u16*)&user_stick_cal[0xB] == 0xA1B2) {
                 // Center X,Y
                 decode_stick_params(decoded_stick_pair + 8, user_stick_cal + 13);
@@ -6501,7 +6647,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
         this->numeric_StickParamDeadzone2->Enabled   = false;
         this->numeric_StickParamRangeRatio2->Enabled = false;
         this->lbl_proStickHelp->Enabled              = false;
-        if (handle_ok == 3) {
+        if (handle_type == PROCON) {
             decode_stick_params(decoded_stick_pair + 14, stick_model_pro_right);
             this->numeric_StickParamDeadzone2->Value   = decoded_stick_pair[14];
             this->numeric_StickParamRangeRatio2->Value = decoded_stick_pair[15];
@@ -6530,7 +6676,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
             memset(user_sensor_cal,    0, sizeof(user_sensor_cal));
             memset(decoded_stick_pair, 0, sizeof(decoded_stick_pair));
 
-            if (handle_ok != 2 && this->checkBox_enableLeftUserCal->Checked) {
+            if (handle_type != 2 && this->checkBox_enableLeftUserCal->Checked) {
                 *(u16*)&user_stick_cal[0] = 0xA1B2;
                 // Center X,Y
                 decoded_stick_pair[0] = (u16)this->numeric_leftUserCal_x_center->Value;
@@ -6549,7 +6695,7 @@ public ref class FormJoy : public System::Windows::Forms::Form
                 // Erase left stick user cal
                 memset(user_stick_cal, 0xFF, 11);
             }
-            if (handle_ok != 1 && this->checkBox_enableRightUserCal->Checked) {
+            if (handle_type != 1 && this->checkBox_enableRightUserCal->Checked) {
                 *(u16*)&user_stick_cal[11] = 0xA1B2;
                 // Center X,Y
                 decoded_stick_pair[0] = (u16)this->numeric_rightUserCal_x_center->Value;
@@ -6618,14 +6764,14 @@ public ref class FormJoy : public System::Windows::Forms::Form
             encode_stick_params(stick_model_main_left, decoded_stick_pair);
 
             // Pro's Right Stick
-            if (handle_ok == 3) {
+            if (handle_type == PROCON) {
                 decoded_stick_pair[2] = (u16)this->numeric_StickParamDeadzone2->Value;
                 decoded_stick_pair[3] = (u16)this->numeric_StickParamRangeRatio2->Value;
                 encode_stick_params(stick_model_pro_right, decoded_stick_pair + 2);
             }
 
             int res = write_spi_data(0x6089, sizeof(stick_model_main_left), stick_model_main_left);
-            if (res == 0 && handle_ok == 3) {
+            if (res == 0 && handle_type == PROCON) {
                 Sleep(100);
                 res = write_spi_data(0x609B, sizeof(stick_model_pro_right), stick_model_pro_right);
             }
@@ -6639,13 +6785,30 @@ public ref class FormJoy : public System::Windows::Forms::Form
 
     private: System::Boolean check_if_connected() {
         if (!device_connection()) {
-            MessageBox::Show(L"The device was disconnected!\n\n" +
-                L"Press a button on the controller to re-connect\nand try again!",
-                L"CTCaer's Joy-Con Toolkit - Connection Error!", MessageBoxButtons::OK, MessageBoxIcon::Stop);
+            this->iRCameraToolStripMenuItem->Enabled = false;
+            this->grpBox_nfc->Enabled = false;
+
+            this->textBoxSN->Text = L"Disconnected";
+            this->textBoxFW->Text = L"0.00";
+            this->textBoxMAC->Text = L"00:00:00:00:00:00";
+            this->textBoxDev->Text = L"None";
+            this->lbl_Buttons_hex_txt->Text = L"";
+            this->lbl_Body_hex_txt->Text = L"";
+
+            this->toolStripBtn_batt->ToolTipText = "";
+
+            if (temp_celsius)
+                this->toolStripLabel_temp->Text = String::Format(L"{0:f1}\u2103 ", 0);
+            else
+                this->toolStripLabel_temp->Text = String::Format(L"{0:f1}\u2109 ", 0);
+            this->grpBox_Color->Enabled = false;
+            this->pictureBoxPreview->Image = nullptr;
             return true;
         }
-        else
+        else {
+            this->grpBox_Color->Enabled = true;
             return false;
+        }
     }
 
 
@@ -6693,6 +6856,26 @@ public ref class FormJoy : public System::Windows::Forms::Form
             }
         }
         this->txtBox_NFCTag->Text = ntag_temp_string;
+    }
+    private: System::Void proControllerToolStripMenuItem_Click(System::Object^ sender, System::EventArgs^ e) {
+        this->dropDown_controllerPrioritySelection->Text = "Pro controller";
+        handle_priority = PROCON;
+        full_refresh(true);
+    }
+    private: System::Void joyConRToolStripMenuItem_Click(System::Object^ sender, System::EventArgs^ e) {
+        this->dropDown_controllerPrioritySelection->Text = "Joy-Con (R)";
+        handle_priority = JOYCON_R;
+        full_refresh(true);
+    }
+    private: System::Void joyConLToolStripMenuItem_Click(System::Object^ sender, System::EventArgs^ e) {
+        this->dropDown_controllerPrioritySelection->Text = "Joy-Con (L)";
+        handle_priority = JOYCON_L;
+        full_refresh(true);
+    }
+    private: System::Void anyToolStripMenuItem_Click(System::Object^ sender, System::EventArgs^ e) {
+        this->dropDown_controllerPrioritySelection->Text = "Any";
+        handle_priority = NOTHING;
+        full_refresh(true);
     }
 };
 }

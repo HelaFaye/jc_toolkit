@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Nintendo Joy-Con (L), Joy-Con (R), Pro Controller and the Joy-Con Charging Grip -->
+<resources>
+    <usb-device vendor-id="1406" product-id="8198" />
+    <usb-device vendor-id="1406" product-id="8199" />
+    <usb-device vendor-id="1406" product-id="8201" />
+    <usb-device vendor-id="1406" product-id="8206" />
+</resources>
