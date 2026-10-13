@@ -8,8 +8,11 @@ import sys
 # Before Kivy is imported (here and in PyInstaller's hook subprocesses): leave Python's
 # logging alone. Otherwise Kivy sets it to TRACE and echoes every PyInstaller message through
 # its own handler (186k lines, then a hang, on the Windows runner).
+# And no real OpenGL: something in the build opens Kivy's window, and on a runner without
+# OpenGL 2.0 (Windows: only "GDI Generic" 1.1) Kivy shows a "The application will leave now"
+# message box that waits forever. The mock backend is only for the build, not the app.
 for name, value in (("KIVY_LOG_MODE", "PYTHON"), ("KIVY_NO_CONSOLELOG", "1"), ("KIVY_NO_FILELOG", "1"),
-                    ("KIVY_NO_ARGS", "1")):
+                    ("KIVY_NO_ARGS", "1"), ("KIVY_GL_BACKEND", "mock")):
     os.environ.setdefault(name, value)
 
 from kivy.tools.packaging.pyinstaller_hooks import get_deps_minimal, hookspath, runtime_hooks
