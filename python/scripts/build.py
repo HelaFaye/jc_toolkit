@@ -89,11 +89,22 @@ def build_bluetooth_helper(ndk):
         print("Built the Bluetooth helper:", os.path.relpath(out, ROOT))
 
 
+def android_venv():
+    """.venv-android: buildozer installs python-for-android's tools with pip --user, which a
+    venv allows only when it sees the system site-packages. Returns its bin folder."""
+    venv = os.path.join(ROOT, ".venv-android")
+    bin_dir = os.path.join(venv, "bin")
+    if not os.path.exists(os.path.join(bin_dir, "python")):
+        subprocess.check_call([sys.executable, "-m", "venv", "--system-site-packages", venv])
+    subprocess.check_call([os.path.join(bin_dir, "python"), "-m", "pip", "install", "--upgrade",
+                           "buildozer", "cython<3.1", "setuptools"])
+    return bin_dir
+
+
 def android(mode="debug"):
     if sys.platform == "win32":
         sys.exit("Android builds need Linux or macOS (on Windows: WSL2, or the GitHub Actions workflow).")
-    pip("buildozer", "cython<3.1", "setuptools")
-    bin_dir = os.path.dirname(sys.executable)
+    bin_dir = android_venv()
     buildozer = [os.path.join(bin_dir, "buildozer"), "android", mode]
     # buildozer looks for cython (and runs pip) from PATH: the venv's first
     os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")

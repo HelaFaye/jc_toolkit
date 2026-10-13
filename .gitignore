@@ -303,3 +303,4 @@ python/*.egg-info/
 python/jctool/native/
 run.txt
 python/traffic_log.txt
+python/.venv-android/

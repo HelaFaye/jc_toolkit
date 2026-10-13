@@ -1,7 +1,6 @@
 """The Bluetooth hidraw bridge end to end: the native helper (native/jctool_hidraw.c, built
 here with the system's C compiler) over a fake /sys and /dev, where the "hidraw node" is a
 SOCK_SEQPACKET socket with the emulated Joy-Con behind it."""
-import fcntl
 import os
 import select
 import shutil
@@ -73,6 +72,7 @@ class FakeHidraw:
     def _generic_bind(self, fifo):
         """Keeps the FIFO's buffer full, so the helper's write of the id blocks there: the
         parameter is checked while the helper is inside the bind, then the buffer drained."""
+        import fcntl                                         # Linux only (the module is skipped elsewhere)
         fd = os.open(fifo, os.O_RDWR | os.O_NONBLOCK)
         fcntl.fcntl(fd, 1031, 4096)                          # F_SETPIPE_SZ: one page
         filled = 0

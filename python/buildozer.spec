@@ -8,7 +8,7 @@ package.name = jctool
 package.domain = org.jctool
 source.dir = .
 source.include_exts = py,png
-source.exclude_dirs = tests,tools,scripts,packaging,build,dist,bin,.venv,.buildozer,.pytest_cache
+source.exclude_dirs = tests,tools,scripts,packaging,build,dist,bin,.venv,.venv-android,.buildozer,.pytest_cache,native
 version.regex = __version__ = ["'](.*)["']
 version.filename = %(source.dir)s/jctool/__init__.py
 # No hidapi or MIDI device libraries on Android: USB goes through jctool/android_usb.py
