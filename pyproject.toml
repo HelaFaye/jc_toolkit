@@ -16,7 +16,7 @@ dependencies = [
 
 [project.optional-dependencies]
 midi = ["mido>=1.3", "python-rtmidi>=1.5"]
-test = ["pytest"]
+test = ["pytest", "pytest-timeout"]
 build = ["pyinstaller>=6.0"]
 
 [project.scripts]

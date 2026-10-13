@@ -5,6 +5,13 @@
 import os
 import sys
 
+# Before Kivy is imported (here and in PyInstaller's hook subprocesses): leave Python's
+# logging alone. Otherwise Kivy sets it to TRACE and echoes every PyInstaller message through
+# its own handler (186k lines, then a hang, on the Windows runner).
+for name, value in (("KIVY_LOG_MODE", "PYTHON"), ("KIVY_NO_CONSOLELOG", "1"), ("KIVY_NO_FILELOG", "1"),
+                    ("KIVY_NO_ARGS", "1")):
+    os.environ.setdefault(name, value)
+
 from kivy.tools.packaging.pyinstaller_hooks import get_deps_minimal, hookspath, runtime_hooks
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))

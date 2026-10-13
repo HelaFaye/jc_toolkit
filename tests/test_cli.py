@@ -124,8 +124,16 @@ def test_midi_file(capsys, monkeypatch, tmp_path):
 
 
 def test_list_hid_and_bad_choice(capsys, monkeypatch, tmp_path):
+    import types
+    from jctool import hidio
+    # Not the system's HID devices: on macOS listing them waits for the Input Monitoring
+    # permission, which a CI runner never answers
+    fake_hid = types.ModuleType("fakehid")
+    fake_hid.enumerate = lambda vid=0, pid=0: [{"path": b"/dev/fake0", "vendor_id": 0x057E, "product_id": 0x2007,
+                                                "product_string": "Joy-Con (R)", "usage": 5, "usage_page": 1}]
+    monkeypatch.setattr(hidio, "hid_module", lambda: fake_hid)
     out, _ = run(capsys, monkeypatch, tmp_path, ["17", "99", "abc"])
-    assert "Backend:" in out and out.count("[-] Invalid choice") == 2
+    assert "Backend: fakehid" in out and '0x2007 "Joy-Con (R)"' in out and out.count("[-] Invalid choice") == 2
 
 
 def test_end_of_input_exits(capsys, monkeypatch, tmp_path):
