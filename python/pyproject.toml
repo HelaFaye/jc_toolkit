@@ -21,6 +21,7 @@ build = ["pyinstaller>=6.0"]
 
 [project.scripts]
 jctool = "jctool.app.main:main"
+jctool-cli = "jctool.cli:main"
 
 [tool.setuptools]
 packages = ["jctool", "jctool.app"]

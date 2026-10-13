@@ -457,6 +457,9 @@ def ntag_text(data, pages):
 
 # ----------------------------------------------------------------------------------------
 # Debug custom command
+# Disabled unless expert mode is on, like the original: 0x10 SPI read, 0x11 SPI write,
+# 0x12 SPI sector erase
+SPI_SUBCOMMANDS = (0x10, 0x11, 0x12)
 def debug_command_args(cmd=0x01, hf_freq=0x00, hf_amp=0x01, lf_freq=0x40, lf_amp=0x40, subcmd=0x00, arguments=""):
     """The 44 byte custom command buffer, with the window's argument parser: pairs of hex
     digits, a leading low nibble if odd."""
