@@ -55,7 +55,10 @@ class Input:
             return None
         if line is None:           # End of input doesn't stop it (a script ran out of lines); exits at the next prompt
             self.lines.put(None)
+            self.ended = True
         return line
+
+    ended = False                  # True once the end of input was seen
 
 
 class CliUi(Ui):
@@ -332,6 +335,8 @@ class Cli:
             line = self.input.typed()
             if line is not None:
                 return line
+            if self.input.ended:       # No one left to press Enter: cancel
+                return "q"
 
     def stick_wizard(self, left):
         """Guided stick calibration: a StickCal, or None if cancelled."""

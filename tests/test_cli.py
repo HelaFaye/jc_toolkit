@@ -145,11 +145,20 @@ def test_end_of_input_exits(capsys, monkeypatch, tmp_path):
 
 
 def test_guided_stick_calibration(capsys, monkeypatch, tmp_path):
-    """Typed with pauses while the emulated stick rests, then turns along its edge."""
+    """Typed while the emulated stick rests, then turns along its edge, following the
+    calibration's own steps (a slow machine takes longer to measure the center)."""
     import math
     import threading
     import time
+    from jctool import calibration
     monkeypatch.chdir(tmp_path)
+    wizards = []
+
+    class Recorded(calibration.StickWizard):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            wizards.append(self)
+    monkeypatch.setattr(calibration, "StickWizard", Recorded)
     r, w = os.pipe()
     app = cli.Cli(cli.parse_args(["--demo"]), stream=os.fdopen(r))
     app.found()
@@ -157,16 +166,24 @@ def test_guided_stick_calibration(capsys, monkeypatch, tmp_path):
     fake.stick_raw = (2000, 2100)
     out = os.fdopen(w, "w")
 
+    def wait(cond, seconds=60):
+        end = time.monotonic() + seconds
+        while not cond() and time.monotonic() < end:
+            time.sleep(0.01)
+
     def type_and_turn():
         for line in ("11", "1", "y", "y"):        # Set a right stick calibration, measured
             out.write(line + "\n")
             out.flush()
-        time.sleep(1.5)                           # The center: the stick at rest
+        wait(lambda: wizards and wizards[0].step == wizards[0].ROTATE)   # The center: the stick at rest
         a = 0.0
-        end = time.monotonic() + 3
-        while time.monotonic() < end:             # Rotating along the edge
+        while not wizards[0].can_finish and a < math.radians(360 * 30):   # Rotating along the edge
             fake.stick_raw = (2000 + round(1200 * math.cos(a)), 2100 + round(1200 * math.sin(a)))
             a += math.radians(8)
+            time.sleep(0.01)
+        for i in range(90):                       # And once more around, for the edges
+            fake.stick_raw = (2000 + round(1200 * math.cos(a)), 2100 + round(1200 * math.sin(a)))
+            a += math.radians(4)
             time.sleep(0.01)
         fake.stick_raw = (2000, 2100)
         for line in ("", "n", "y", "6", "0"):     # Enter: done; no 6-axis; write; read it back
@@ -188,3 +205,12 @@ def test_guided_stick_calibration(capsys, monkeypatch, tmp_path):
     assert "[+] The user calibration was written to SPI!" in text
     assert "Right stick: center (2000, 2100)  X [%d - %d]  Y [%d - %d]" % (
         measured[0], measured[2], measured[3], measured[5]) in text
+
+
+def test_guided_calibration_cancelled_at_end_of_input(capsys, monkeypatch, tmp_path):
+    """A script that ends in the middle of a guided calibration doesn't hang."""
+    monkeypatch.chdir(tmp_path)
+    app = cli.Cli(cli.parse_args(["--demo"]), stream=io.StringIO("11\n1\ny\ny\n"))
+    with pytest.raises(SystemExit) as e:
+        app.run()
+    assert e.value.code == 0 and "Calibration cancelled." in capsys.readouterr().out
