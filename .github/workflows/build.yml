@@ -1,6 +1,6 @@
 # Joy-Con Toolkit: tests, then builds for Linux, Windows, macOS and Android.
 # The builds are attached to each run (Actions > run > Artifacts); a tag v* also publishes
-# them as a GitHub release.
+# them as a GitHub release, as does a manual run (Actions > Build > Run workflow) given a tag.
 name: Build
 
 on:
@@ -10,6 +10,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Publish a release under this new tag (e.g. v5.2.0); empty only builds"
+        required: false
+        default: ""
 
 jobs:
   test:
@@ -106,7 +111,7 @@ jobs:
           path: bin/*.apk
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
     needs: [desktop, android]
     runs-on: ubuntu-latest
     permissions:
@@ -118,4 +123,7 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          # On a tag push both are empty and the pushed tag is used
+          tag_name: ${{ inputs.tag }}
+          target_commitish: ${{ inputs.tag != '' && github.sha || '' }}
           files: out/*
