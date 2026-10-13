@@ -13,7 +13,7 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
 
-from .. import ops
+from .. import ops, presets
 from ..hidio import JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, list_hid_devices
 from . import storage
 from .widgets import (ACCENT, BACK, BUTTON, DARK, DIM, ERROR, GRID, TEXT, WARN, Btn, Check, Choice, Field,
@@ -59,6 +59,27 @@ def choose_controller(found, on_chosen):
         box.add_widget(Btn(text, lambda f=f: (popup.dismiss(), on_chosen(f))))
     box.add_widget(Widget())
     popup.open()
+
+
+class Swatch(Btn):
+    """A color preset button: one color, or two (body over buttons, or left / right grip)."""
+
+    def __init__(self, a, b, name, on_press, **kw):
+        super().__init__("", on_press, size_hint_y=None, height=dp(36), **kw)
+        self.colors = (a, b)
+        self.name = name
+        self.bind(pos=self._draw, size=self._draw)
+
+    def _draw(self, *_):
+        self.canvas.after.clear()
+        a, b = self.colors
+        x, y, w, h = self.x + dp(2), self.y + dp(2), self.width - dp(4), self.height - dp(4)
+        with self.canvas.after:
+            Color(*rgba(*a))
+            Rectangle(pos=(x, y + (h / 2 if b else 0)), size=(w, h / 2 if b else h))
+            if b:
+                Color(*rgba(*b))
+                Rectangle(pos=(x, y), size=(w, h / 2))
 
 
 # ----------------------------------------------------------------------------------------
@@ -169,6 +190,8 @@ class DevicePanel(Panel):
         self.run(ops.read_colors, lambda r: None if isinstance(r, Exception) else self.show_colors(r))
 
     def pick(self, key):
+        """The color dialog: a picker, the retail presets (body + buttons, or grips) and the
+        user's own colors (colors.xml)."""
         try:
             start = ops.parse_color(self.fields[key].text)
         except ValueError:
@@ -176,15 +199,66 @@ class DevicePanel(Panel):
         box = Filled(orientation="vertical", color=BACK, padding=dp(8), spacing=dp(6))
         picker = ColorPicker(color=rgba(*start))
         box.add_widget(picker)
-        popup = Popup(title="Pick a color", content=box, size_hint=(0.8, 0.9), background="", background_color=DARK,
+        popup = Popup(title="Pick a color: %s" % {"body": "body", "buttons": "buttons", "lgrip": "left grip",
+                                                  "rgrip": "right grip"}[key],
+                      content=box, size_hint=(0.9, 0.95), background="", background_color=DARK,
                       title_color=ACCENT, separator_color=ACCENT)
+        grips = key in ("lgrip", "rgrip")
+        user_path = storage.data_path("colors.xml")
+
+        def use_pair(a, b):
+            k1, k2 = ("lgrip", "rgrip") if grips else ("body", "buttons")
+            self.fields[k1].text, self.fields[k2].text = ops.hex_color(a), ops.hex_color(b)
+            popup.dismiss()
+            self.update_preview()
+        retail = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(4))
+        retail.add_widget(Lbl("Grips:" if grips else "Retail:", color=DIM, size_hint_x=None, width=dp(60)))
+        for name, a, b in (presets.GRIPS if grips else presets.RETAIL):
+            retail.add_widget(Swatch(a, b, name, lambda a=a, b=b: use_pair(a, b)))
+        box.add_widget(retail)
+
+        user_row = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(4))
+        chosen = {"name": None}
+
+        def fill_user(items):
+            user_row.clear_widgets()
+            user_row.add_widget(Lbl("Yours:", color=DIM, size_hint_x=None, width=dp(60)))
+            for name, rgb in items:
+                def use(name=name, rgb=rgb):
+                    chosen["name"] = name
+                    picker.color = rgba(*rgb)
+                user_row.add_widget(Swatch(rgb, None, name, use))
+            for _ in range(presets.MAX_USER - len(items)):
+                user_row.add_widget(Widget())
+        fill_user(presets.load_user(user_path))
+        box.add_widget(user_row)
+
+        name = Field("", hint_text="Name for your color")
+        row = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(6))
+        row.add_widget(name)
+
+        def save():
+            rgb = tuple(int(round(v * 255)) for v in picker.color[:3])
+            try:
+                fill_user(presets.add_user(user_path, name.text.strip() or ops.hex_color(rgb), rgb))
+            except OSError as e:
+                message("Colors", "Can't save colors.xml:\n%s" % e)
+
+        def remove():
+            if chosen["name"]:
+                fill_user(presets.remove_user(user_path, chosen["name"]))
+                chosen["name"] = None
 
         def ok():
             self.fields[key].text = "#" + picker.hex_color[1:7].upper()
             popup.dismiss()
             self.update_preview()
-        box.add_widget(Btn("OK", ok, size_hint_x=None, width=dp(100)))
+        for text, fn, color in (("Save color", save, TEXT), ("Remove", remove, TEXT), ("OK", ok, ACCENT),
+                                ("Cancel", popup.dismiss, TEXT)):
+            row.add_widget(Btn(text, fn, color=color, size_hint_x=None, width=dp(110)))
+        box.add_widget(row)
         popup.open()
+        return popup
 
     def current_colors(self):
         return tuple(ops.parse_color(self.fields[k].text) for k in ("body", "buttons", "lgrip", "rgrip"))
@@ -606,6 +680,9 @@ class DebugPanel(Panel):
         left.add_widget(Btn("List HID devices", self.list_hid, color=TEXT))
         self.log = Check("Traffic log (traffic_log.txt)", False, self.set_log)
         left.add_widget(self.log)
+        self.expert = Check("Expert mode (SPI subcommands 10-12)", False, color=ERROR)
+        left.add_widget(self.expert)
+        left.add_widget(Btn("About", self.about, color=TEXT))
         left.add_widget(Widget())
         self.add_widget(left)
         scroll = ScrollView(size_hint_x=0.6)
@@ -621,9 +698,21 @@ class DebugPanel(Panel):
                 return int(t, 16) if t else default
             except ValueError:
                 return default
+        if hx("sub") in ops.SPI_SUBCOMMANDS and not self.expert.active:
+            message("Debug", "The subcommands:\n0x10: SPI Read\n0x11: SPI Write\n0x12: SPI Sector Erase\nare disabled!\n\n"
+                    "Turn on expert mode to send them.")
+            return
         args = ops.debug_command_args(hx("cmd", 1), hx("hf"), hx("ha", 1), hx("lf", 0x40), hx("la", 0x40), hx("sub"),
                                       self.fields["args"].text)
         self.run(lambda jc: jc.send_custom_command(args))
+
+    def about(self):
+        from .. import __version__
+        message("About", "Joy-Con Toolkit v%s\n\nCTCaer's Joy-Con Toolkit, ported to Python / Kivy.\n"
+                "Windows, macOS, Linux and Android.\n\nhttps://github.com/HelaFaye/jc_toolkit\n"
+                "Original: https://github.com/CTCaer/jc_toolkit\n\n"
+                "NFC starters by Eric Betts; analog stick math by Ryan Juckett; the MIDI idea from "
+                "Musical-Joycons (sarossilli)." % __version__)
 
     def on_custom_command(self, sent, reply_cmd, reply):
         self.out.text = "Sent:\n%s\n%s\n\n%s" % (sent, reply_cmd, reply)

@@ -27,7 +27,7 @@ jctool-cli = "jctool.cli:main"
 packages = ["jctool", "jctool.app"]
 
 [tool.setuptools.package-data]
-"jctool.app" = ["icon.png"]
+"jctool.app" = ["icon.png", "res/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

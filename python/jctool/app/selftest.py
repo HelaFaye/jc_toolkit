@@ -26,7 +26,7 @@ class SelfTest:
 
     # A step: fn() returns None when done, or a (condition, seconds) to wait for first
     def start(self):
-        self.steps = [self.connected, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
+        self.steps = [self.connected, self.colors, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
                       self.backup, self.midi_file, self.tune, self.finish]
         Clock.schedule_once(lambda dt: self.next(), 1.0)
 
@@ -191,6 +191,60 @@ class SelfTest:
             self.wait(lambda: app.worker.busy_long is None, 3, lambda: (
                 self.check(self.fake.writes - writes > 20, "tune plays and stops"), self.next()))
         self.wait(lambda: self.fake.writes - writes > 30, 5, stop)
+
+    def colors(self):
+        """The color dialog: a retail preset, a saved user color, then Write colors."""
+        app = self.app
+        app.show("Device")
+        dev = app.panels["Device"]
+        self.check(app.img_batt.opacity == 1 and app.img_batt.source.endswith(".png"), "battery icon shown")
+        popup = dev.pick("body")
+        retail = [w for w in popup.content.walk() if w.__class__.__name__ == "Swatch"]
+        blue = [w for w in retail if w.name == "Neon Blue"][0]
+        blue.dispatch("on_press")
+        ok = dev.fields["body"].text == "#0AB9E6" and dev.fields["buttons"].text == "#001E1E"
+        popup = dev.pick("body")
+        from kivy.uix.colorpicker import ColorPicker
+        picker = [w for w in popup.content.walk() if isinstance(w, ColorPicker)][0]
+        picker.color = (0x12 / 255.0, 0x34 / 255.0, 0x56 / 255.0, 1)
+        field = [w for w in popup.content.walk() if getattr(w, "hint_text", "") == "Name for your color"][0]
+        field.text = "Selftest blue"
+        [w for w in popup.content.walk() if getattr(w, "text", "") == "Save color"][0].dispatch("on_press")
+        from .. import presets
+        saved = presets.load_user(storage.data_path("colors.xml"))
+        popup.dismiss()
+        self.check(ok and saved == [("Selftest blue", (0x12, 0x34, 0x56))],
+                   "color presets: retail pair applied, user color saved to colors.xml")
+        from . import panels
+        real_confirm = panels.confirm
+        panels.confirm = lambda title, text, yes, *a, **k: yes()
+        dev.write_colors()
+        panels.confirm = real_confirm
+
+        def done():
+            self.check(bytes(self.fake.spi[0x6050:0x6056]).hex() == "0ab9e6001e1e", "colors written to the controller")
+            self.next()
+        self.wait(lambda: bytes(self.fake.spi[0x6050:0x6053]).hex() == "0ab9e6", 5, done)
+
+    def debug_guard(self):
+        """Expert mode: the SPI subcommands are refused without it."""
+        app = self.app
+        app.show("Debug")
+        dbg = app.panels["Debug"]
+        from . import panels
+        shown = []
+        real_message = panels.message
+        panels.message = lambda title, text, *a, **k: shown.append(text)
+        dbg.fields["sub"].text = "11"
+        dbg.fields["args"].text = "00F0000001AA"
+        writes = self.fake.spi_writes
+        dbg.send()
+        panels.message = real_message
+        dbg.fields["sub"].text = "02"
+        dbg.fields["args"].text = ""
+        self.check(shown and "disabled" in shown[0] and self.fake.spi_writes == writes,
+                   "debug: SPI subcommands disabled without expert mode")
+        self.next()
 
     def finish(self):
         print("\nAll checks passed." if self.failed == 0 else "\n%d check(s) FAILED." % self.failed, flush=True)

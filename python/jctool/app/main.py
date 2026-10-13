@@ -16,18 +16,20 @@ from kivy.core.window import Window                        # noqa: E402
 from kivy.metrics import dp                                # noqa: E402
 from kivy.uix.boxlayout import BoxLayout                   # noqa: E402
 from kivy.uix.gridlayout import GridLayout                 # noqa: E402
+from kivy.uix.image import Image                           # noqa: E402
 from kivy.uix.screenmanager import NoTransition, Screen, ScreenManager   # noqa: E402
 from kivy.uix.scrollview import ScrollView                 # noqa: E402
 
 from .. import calibration, ops                            # noqa: E402
 from ..core import JoyCon, Ui                              # noqa: E402
-from ..hidio import Device, JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, enumerate_controllers, is_android   # noqa: E402
+from ..hidio import Device, JOYCON_L, JOYCON_R, NOTHING, PROCON, TYPE_NAMES, enumerate_controllers, is_android   # noqa: E402
 from .widgets import (ACCENT, BACK, DARK, DIM, ERROR, TEXT, WARN, Btn, Filled, Lbl, Tab, Choice,   # noqa: E402
                       confirm, message)
 from .worker import DeviceWorker                           # noqa: E402
 from . import storage                                      # noqa: E402
 
 
+RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "res")
 PANEL_MIN = (920, 480)       # dp: screens smaller than this scroll (phones)
 
 
@@ -163,8 +165,12 @@ class JoyConToolkitApp(App):
         bar.add_widget(self.lbl_status)
         self.lbl_link = Lbl("Link idle", size_hint_x=None, width=dp(110), halign="right")
         self.lbl_temp = Btn("", self.toggle_temperature, color=TEXT, size_hint_x=None, width=dp(80), height=dp(30))
-        self.lbl_batt = Lbl("", size_hint_x=None, width=dp(170), halign="right")
-        for w in (self.lbl_link, self.lbl_temp, self.lbl_batt):
+        self.lbl_batt = Lbl("", size_hint_x=None, width=dp(110), halign="right")
+        self.img_batt = Image(size_hint_x=None, width=dp(48), opacity=0, fit_mode="contain")
+        self.priority = NOTHING
+        self.choice_priority = Choice(["Prefer: any", "Prefer: Pro", "Prefer: Joy-Con R", "Prefer: Joy-Con L"],
+                                      on_change=self.set_priority, size_hint_x=None, width=dp(150), height=dp(30))
+        for w in (self.choice_priority, self.lbl_link, self.lbl_temp, self.img_batt, self.lbl_batt):
             bar.add_widget(w)
         root.add_widget(bar)
 
@@ -228,6 +234,10 @@ class JoyConToolkitApp(App):
             self.set_status("No controller found. Bluetooth: pair it, allow root access. USB: plug it in (OTG)." if is_android()
                             else "No Joy-Con or Pro Controller found. Pair it, then Connect.", WARN)
             return
+        if self.priority != NOTHING:          # The original's controller priority
+            preferred = [f for f in found if f.type == self.priority and not f.third_party]
+            if preferred:
+                found = preferred[:1]
         if len(found) == 1:
             return self._open_found(found[0])
         from .panels import choose_controller
@@ -293,6 +303,19 @@ class JoyConToolkitApp(App):
         for p in self.panels.values():
             p.on_device()
 
+    def set_priority(self, index):
+        """Prefer a controller type when several are connected (and reconnect)."""
+        self.priority = (NOTHING, PROCON, JOYCON_R, JOYCON_L)[max(index, 0)]
+        if self.jc is not None and self.priority not in (NOTHING, self.jc.type) and not self.demo:
+            self.connect_new()
+
+    def connect_new(self):
+        if self.jc is not None:
+            self.jc.dev.close()
+            self.jc = None
+            self.worker.jc = None
+        self.connect()
+
     def set_calibration_status(self, status):
         self.lbl_cal.value.text = status[0]
 
@@ -300,8 +323,10 @@ class JoyConToolkitApp(App):
         self.worker.run(lambda jc: calibration.read_status(jc), lambda r: None if isinstance(r, Exception) else self.set_calibration_status(r))
 
     def show_battery(self, b):
-        volt, pct, state, _ = b
+        volt, pct, state, level = b
         self.lbl_batt.text = "%.2fV - %d%%" % (volt, pct)
+        self.img_batt.source = os.path.join(RES, ops.battery_image(level))
+        self.img_batt.opacity = 1
         self.lbl_batt.color = ERROR if pct <= 10 else WARN if pct <= 30 else ACCENT
 
     def update_battery(self):

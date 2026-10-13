@@ -26,7 +26,7 @@ def device_info(jc):
 
 
 def battery(jc):
-    """(voltage, percent, state text, level 0-4)"""
+    """(voltage, percent, state text, level): level 0-9 from the report, odd when charging."""
     b = jc.get_battery()
     level = (b[0] & 0xF0) >> 4
     volt = b[1] | (b[2] << 8)
@@ -43,7 +43,13 @@ def battery(jc):
     else:
         pct = 100
     state = BATTERY_STATES[level] if level <= 9 else "?"
-    return volt * 2.5 / 1000, pct, state, level // 2
+    return volt * 2.5 / 1000, pct, state, level
+
+
+def battery_image(level):
+    """The original's battery icon for a level 0-9: batt_0..batt_100, _chr when charging."""
+    name = "batt_%d" % (0, 25, 50, 75, 100)[min(level, 9) // 2]
+    return name + ("_chr" if level % 2 else "") + ".png"
 
 
 def temperature_c(jc):

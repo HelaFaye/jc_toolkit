@@ -35,7 +35,8 @@ def test_device_info_and_calibration(capsys, monkeypatch, tmp_path):
 
 
 def test_colors_written_after_confirmation(capsys, monkeypatch, tmp_path):
-    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "123456", "abcdef", "y"])
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "12345", "zz3456", "123456", "abcdef", "y"])
+    assert out.count("Enter a color as RRGGBB") == 2
     assert "[+] The colors were written to the device!" in out
     assert bytes(fake.spi[0x6050:0x6056]).hex() == "123456abcdef"
 

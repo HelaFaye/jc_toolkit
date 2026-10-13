@@ -168,10 +168,10 @@ class Cli:
             answer = self.read_line("%s [%s]: " % (question, ops.hex_color(rgb)[1:])).strip()
             if not answer:
                 return False, rgb
-            c = ops.parse_color(answer)
-            if c is not None:
-                return True, c
-            print("  Enter a color as RRGGBB (hex), e.g. FF3C28.")
+            try:
+                return True, ops.parse_color(answer)
+            except ValueError:
+                print("  Enter a color as RRGGBB (hex), e.g. FF3C28.")
 
     # --- Connection
     def found(self):

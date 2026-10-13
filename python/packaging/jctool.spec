@@ -21,7 +21,8 @@ if sys.platform.startswith("linux"):
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
     pathex=[ROOT],
-    datas=[(os.path.join(ROOT, "jctool", "app", "icon.png"), os.path.join("jctool", "app"))],
+    datas=[(os.path.join(ROOT, "jctool", "app", "icon.png"), os.path.join("jctool", "app")),
+           (os.path.join(ROOT, "jctool", "app", "res"), os.path.join("jctool", "app", "res"))],
     hiddenimports=hidden,
     excludes=deps["excludes"] + ["pytest", "jnius", "android"],
     hookspath=hookspath(),
