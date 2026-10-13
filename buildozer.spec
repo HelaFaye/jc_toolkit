@@ -26,6 +26,12 @@ android.manifest.intent_filters = packaging/android/usb_intent_filter.xml
 android.add_resources = packaging/android/device_filter.xml:xml/device_filter.xml
 android.allow_backup = True
 
+# python-for-android: develop, pinned. master installs the pure-Python dependencies it
+# resolves (Kivy's: requests, charset-normalizer...) without the Android platform tags,
+# and pip refuses charset-normalizer's Android wheel ("not a supported wheel").
+p4a.branch = develop
+p4a.commit = f644456401e90d2b9083481a6126e46b85c5ef36
+
 [buildozer]
 log_level = 2
 warn_on_root = 0
