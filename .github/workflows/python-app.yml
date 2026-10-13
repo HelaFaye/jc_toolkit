@@ -5,8 +5,10 @@ name: Python app
 
 on:
   push:
-    paths: ["python/**", ".github/workflows/python-app.yml"]
+    # Both: with tags alone, a branch push wouldn't run it
+    branches: ["**"]
     tags: ["v*"]
+    paths: ["python/**", ".github/workflows/python-app.yml"]
   pull_request:
     paths: ["python/**", ".github/workflows/python-app.yml"]
   workflow_dispatch:
