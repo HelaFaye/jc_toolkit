@@ -4,7 +4,7 @@ Joy-Con Toolkit changes and inspects official Nintendo Switch Joy-Cons and Pro C
 their colors, SPI flash backups, serial number, stick and motion calibration, HD Rumble, the
 IR camera and NFC. This is CTCaer's Joy-Con Toolkit v5.2.0, ported to Python with a
 [Kivy](https://kivy.org) interface: one app for **Windows, macOS, Linux and Android**, plus a
-command line version.
+command line version, and a **Nintendo Switch** homebrew version.
 
 ## Download
 
@@ -14,9 +14,12 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 | System | File | Start |
 |---|---|---|
 | Windows (64-bit) | `JoyConToolkit-<version>-windows-x86_64.zip` | Unzip, run `JoyConToolkit\JoyConToolkit.exe` |
+| Windows (32-bit) | `JoyConToolkit-<version>-windows-x86.zip` | The same (no MIDI devices: python-rtmidi has no 32-bit build; MIDI files work) |
 | macOS (Apple Silicon) | `JoyConToolkit-<version>-macos-arm64.zip` | Unzip, open `Joy-Con Toolkit.app` |
 | Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/JoyConToolkit` (see [Linux](#linux) for permissions) |
+| Linux (64-bit ARM: Raspberry Pi 4/5...) | `JoyConToolkit-<version>-linux-arm64.tar.gz` | The same |
 | Android (arm64, armv7) | `jctool-<version>-arm64-v8a_armeabi-v7a-debug.apk` | Install it (allow installing from your browser / file manager) |
+| Nintendo Switch (homebrew) | `JoyConToolkit-<version>-switch.nro` | Copy it to `/switch/` on the SD card, open it from the Homebrew Menu (see [Nintendo Switch](#nintendo-switch)) |
 
 The desktop builds include the command line next to the app: `jctool-cli` (`jctool-cli.exe`
 on Windows; `Joy-Con Toolkit.app/Contents/MacOS/jctool-cli` on macOS).
@@ -115,6 +118,32 @@ after a backup the app also offers to save a copy anywhere (Downloads, Drive...)
 opened with Android's file picker. On a phone the screens scroll; the tabs and the status
 bar stay. The Debug tab's HID listing says why Bluetooth found nothing (e.g. root denied).
 
+### Nintendo Switch
+
+A homebrew app (`switch/`, C with [libnx](https://github.com/switchbrew/libnx)) for a Switch
+running custom firmware (Atmosphere) and the Homebrew Menu, system version 6.0.0 or newer.
+It works on the controllers connected to the Switch, through the Switch's own HID services,
+so there's nothing to pair: choose a controller from the list.
+
+| Screen | What it does |
+|---|---|
+| Device info | Type, connection, MAC, S/N, battery, colors, which calibration is in use |
+| Colors | RGB editor for the body, buttons and (Pro Controller) grips, the retail and grip presets, your colors (`colors.xml`, the desktop app's format) |
+| Back up / Restore | A 512KB SPI backup in the desktop app's format (`spi_<type>_<MAC>.bin`, so backups move between the two), with the same checks; restore the colors, S/N, user calibration, or a full restore |
+| Calibration | The factory and user stick and motion calibration, and back to factory |
+| Serial number | Change it (the original is kept inside the controller) and restore it |
+| Button test | Buttons, sticks and motion sensors, as the Switch reports them |
+| HD Rumble | A tester for both bands, and `.jcvib` / `.bnvib` playback |
+| IR camera | A live preview (like `jctool-cli`'s) with exposure, gain, LEDs and negative, and 320x240 pictures (`.bmp`) |
+| NFC | A tag's UID and type |
+| HOME LED, SPI flash viewer, Disconnect | |
+
+Its files are in `/switch/jctool/` on the SD card. The Switch applies the controller's
+calibration itself, so stick and motion calibration are done in System Settings >
+Controllers and Sensors, and the app offers only the readout and the reset. The Switch
+doesn't let homebrew send the controller raw commands, so there's no player LED control,
+NFC tag dumps or the easter-egg HD Rumble tunes; the desktop app has those.
+
 ## Running from source
 
 Python 3.8 or newer. The setup script makes a virtual environment in `.venv` with the app,
@@ -131,8 +160,9 @@ Or by hand: `python3 -m venv .venv`, then `.venv/bin/pip install -e ".[midi,test
 ## Building
 
 Every build starts from the venv. PyInstaller builds only for the system it runs on; the
-`Build` workflow (`.github/workflows/build.yml`) runs the tests and builds all four on
-GitHub Actions with each push, and a `v*` tag publishes them as a release.
+`Build` workflow (`.github/workflows/build.yml`) runs the tests and builds them all on
+GitHub Actions with each push, and a `v*` tag (or a manual run given a tag) publishes them
+as a release.
 
 | Target | Command | Output |
 |---|---|---|
@@ -140,6 +170,7 @@ GitHub Actions with each push, and a `v*` tag publishes them as a release.
 | Windows | `.venv\Scripts\python scripts\build.py desktop` | `dist\JoyConToolkit\JoyConToolkit.exe` and a `.zip` |
 | macOS | `.venv/bin/python scripts/build.py desktop` | `dist/Joy-Con Toolkit.app` and a `.zip` |
 | Android | `.venv/bin/python scripts/build.py android` (Linux or macOS; on Windows use WSL2) | `bin/jctool-<version>-*-debug.apk` |
+| Switch | `make -C switch` with [devkitPro](https://devkitpro.org/wiki/Getting_Started)'s devkitA64 and libnx, or `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch` | `switch/jctool.nro` |
 
 - Desktop builds use `packaging/jctool.spec` (PyInstaller). The packaged app saves its files
   in `Documents/Joy-Con Toolkit`.
@@ -150,6 +181,8 @@ GitHub Actions with each push, and a `v*` tag publishes them as a release.
   libffi-dev libssl-dev`. The Bluetooth helper is compiled with the NDK's clang for each of
   the APK's ABIs before buildozer packs the app (`scripts/build.py helper` compiles only it).
   `scripts/build.py android release` makes an unsigned release APK/AAB to sign.
+- A 32-bit Python on Windows builds the 32-bit app: `setup_venv.bat` and `build.py` pick
+  Kivy 2.3.0 (the last with 32-bit wheels, `packaging/constraints-win32.txt`).
 - `tools/make_icons.py` redraws the icons; `tools/gen_tables.py` regenerates
   `jctool/tables.py` from the original's C headers in `tools/headers`.
 
@@ -175,6 +208,7 @@ GitHub Actions with each push, and a `v*` tag publishes them as a release.
 | `jctool/app/` | The Kivy app. Every controller call runs on one device thread; long operations run the commands queued meanwhile between reports, like the original did from its message loop |
 | `jctool/cli.py` | The command line |
 | `jctool/tables.py` | Generated from `tools/headers` by `tools/gen_tables.py` |
+| `switch/` | The Switch homebrew. `switch/source/tables.h` is generated from `jctool/tables.py` by `tools/gen_switch_tables.py` |
 
 ## Credits
 

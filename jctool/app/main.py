@@ -20,7 +20,7 @@ from kivy.uix.image import Image                           # noqa: E402
 from kivy.uix.screenmanager import NoTransition, Screen, ScreenManager   # noqa: E402
 from kivy.uix.scrollview import ScrollView                 # noqa: E402
 
-from .. import calibration, ops                            # noqa: E402
+from .. import __version__, calibration, ops               # noqa: E402
 from ..core import JoyCon, Ui                              # noqa: E402
 from ..hidio import Device, JOYCON_L, JOYCON_R, NOTHING, PROCON, TYPE_NAMES, enumerate_controllers, is_android   # noqa: E402
 from .widgets import (ACCENT, BACK, DARK, DIM, ERROR, TEXT, WARN, Btn, Filled, Lbl, Tab, Choice,   # noqa: E402
@@ -92,7 +92,7 @@ class InfoRow(BoxLayout):
 
 
 class JoyConToolkitApp(App):
-    title = "Joy-Con Toolkit v5.2.0"
+    title = "Joy-Con Toolkit v" + __version__
     icon = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
 
     def __init__(self, demo=False, traffic_log=False, **kw):
