@@ -33,7 +33,18 @@ def system_name():
     return {"win32": "windows", "darwin": "macos"}.get(sys.platform, "linux")
 
 
+def arch_name():
+    """x86_64, x86, arm64: the Python's architecture (a 32-bit Python on 64-bit Windows is x86)."""
+    machine = platform.machine().lower()
+    if machine in ("amd64", "x86_64", "i386", "i686", "x86"):
+        return "x86_64" if sys.maxsize > 2 ** 32 else "x86"
+    return {"aarch64": "arm64"}.get(machine, machine)
+
+
 def desktop():
+    if arch_name() == "x86" and sys.platform == "win32":
+        # Kivy's last 32-bit Windows wheels (see setup_venv.bat)
+        os.environ.setdefault("PIP_CONSTRAINT", os.path.join(ROOT, "packaging", "constraints-win32.txt"))
     pip("pyinstaller>=6.0")
     if sys.platform == "win32":
         pip("kivy_deps.sdl2", "kivy_deps.glew", "kivy_deps.angle")
@@ -41,8 +52,7 @@ def desktop():
     subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
                            "--distpath", dist, "--workpath", os.path.join(ROOT, "build", "pyinstaller"),
                            os.path.join(ROOT, "packaging", "jctool.spec")])
-    arch = platform.machine().lower().replace("amd64", "x86_64")
-    archive = os.path.join(dist, "JoyConToolkit-%s-%s-%s" % (__version__, system_name(), arch))
+    archive = os.path.join(dist, "JoyConToolkit-%s-%s-%s" % (__version__, system_name(), arch_name()))
     if sys.platform == "darwin":
         # ditto keeps the app bundle's symlinks and attributes
         subprocess.check_call(["ditto", "-c", "-k", "--keepParent", os.path.join(dist, "Joy-Con Toolkit.app"),

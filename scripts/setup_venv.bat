@@ -11,8 +11,14 @@ if not exist .venv\Scripts\python.exe (
         python -m venv .venv 2>nul || py -3 -m venv .venv || goto :error
     )
 )
+rem 32-bit Python: Kivy 2.3.0 has the last 32-bit wheels, and python-rtmidi has none (no MIDI devices)
+set "EXTRAS=midi,test"
+.venv\Scripts\python -c "import sys; sys.exit(sys.maxsize > 2**32)" && (
+    set "EXTRAS=test"
+    set "PIP_CONSTRAINT=%CD%\packaging\constraints-win32.txt"
+)
 .venv\Scripts\python -m pip install --upgrade pip || goto :error
-.venv\Scripts\python -m pip install -e ".[midi,test]" || goto :error
+.venv\Scripts\python -m pip install -e ".[%EXTRAS%]" || goto :error
 echo.
 echo Ready. Run the app with: .venv\Scripts\jctool   (or: .venv\Scripts\activate, then jctool)
 exit /b 0
