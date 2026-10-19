@@ -9,6 +9,12 @@ import os
 import sys
 
 os.environ.setdefault("KIVY_NO_ARGS", "1")
+# Kivy's own SDL2 (in its wheels, so in these builds) has no Wayland driver: on a desktop
+# that asks SDL for Wayland (SDL_VIDEODRIVER=wayland, common on KDE and GNOME setups), use
+# XWayland instead
+if (sys.platform.startswith("linux") and "wayland" in os.environ.get("SDL_VIDEODRIVER", "").lower()
+        and os.environ.get("DISPLAY")):
+    os.environ["SDL_VIDEODRIVER"] = "x11"
 
 from kivy.app import App                                   # noqa: E402
 from kivy.clock import Clock                               # noqa: E402
@@ -377,6 +383,9 @@ def main(argv=None):
     p.add_argument("-d", action="store_true", help="write traffic_log.txt")
     p.add_argument("--selftest", action="store_true", help="drive the screens against an emulated Joy-Con (R) and exit")
     args = p.parse_args(argv)
+    if Window is None:
+        sys.exit("Joy-Con Toolkit couldn't open a window (see Kivy's messages above). On Linux it needs X11 "
+                 "or XWayland; if SDL_VIDEODRIVER is set, try SDL_VIDEODRIVER=x11.")
     demo = {"l": JOYCON_L, "r": JOYCON_R, "pro": PROCON}[args.demo] if args.demo else False
     if args.selftest:
         demo = JOYCON_R

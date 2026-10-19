@@ -22,8 +22,9 @@ NAME = "JoyConToolkit"
 sys.path.insert(0, ROOT)
 from jctool import __version__  # noqa: E402
 
-# Providers named (not True) so that no window is opened while building
-deps = get_deps_minimal(window="sdl2", text="sdl2", clipboard=["sdl2", "dummy"], image=True,
+# Providers named (not True) so that no window is opened while building. x11: Kivy's fallback
+# when SDL can't open a window
+deps = get_deps_minimal(window=["sdl2", "x11"] if sys.platform.startswith("linux") else "sdl2", text="sdl2", clipboard=["sdl2", "dummy"], image=True,
                         video=None, audio=None, spelling=None, camera=None)
 hidden = deps["hiddenimports"] + ["hid", "mido.backends.rtmidi", "rtmidi"]
 if sys.platform.startswith("linux"):

@@ -93,6 +93,10 @@ the app under Privacy & Security > Input Monitoring.
    `sudo modprobe -r hid_nintendo`, then reconnect it (`sudo modprobe hid_nintendo`
    afterwards for normal gamepad use).
 
+On a Wayland desktop the app's window opens through XWayland (Kivy's SDL2 has no Wayland
+driver; the app switches `SDL_VIDEODRIVER=wayland` to `x11` itself), so XWayland must be
+available, as it is by default on KDE and GNOME.
+
 The app uses hidapi's `hidraw` backend (the `hid` one goes through libusb, which doesn't see
 Bluetooth controllers); `JCTOOL_HID_BACKEND=libusb` switches.
 
