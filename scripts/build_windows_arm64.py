@@ -30,7 +30,10 @@ KIVY = "kivy==2.3.1"
 KIVY_BUILD = ["setuptools~=69.2.0", "wheel~=0.44.0", "packaging~=24.0", "cython>=0.29.1,<=3.0.11"]
 # Kivy's and the app's requirements, without the kivy_deps wheels (installed with --no-deps)
 RUNTIME = ["Kivy-Garden>=0.1.4", "docutils", "pygments", "requests", "filetype", "pywin32",
-           "hidapi>=0.14", "mido>=1.3", "python-rtmidi>=1.5", "pytest", "pytest-timeout"]
+           "hidapi>=0.14", "mido>=1.3", "pytest", "pytest-timeout"]
+# Built with meson, told to use Visual Studio: otherwise it takes the first compiler on
+# PATH, which can be MinGW's gcc for x86_64 (the GitHub runner has one)
+RTMIDI = "python-rtmidi>=1.5"
 
 
 def run(*cmd, **kw):
@@ -102,6 +105,7 @@ def main():
     # and from pip's temp folder some go past Windows' 260-character limit
     run(*pip, "--no-build-isolation", "--no-deps", kivy_source(), env=env)
     run(*pip, *RUNTIME)
+    run(*pip, "--config-settings=setup-args=--vsenv", RTMIDI)
     run(*pip, "--no-deps", "-e", ROOT)
 
     # kivy_deps.vcpkg: vcpkg's DLLs for Kivy (at startup) and for the PyInstaller spec
