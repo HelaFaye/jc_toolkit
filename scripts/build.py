@@ -46,7 +46,8 @@ def desktop():
         # Kivy's last 32-bit Windows wheels (see setup_venv.bat)
         os.environ.setdefault("PIP_CONSTRAINT", os.path.join(ROOT, "packaging", "constraints-win32.txt"))
     pip("pyinstaller>=6.0")
-    if sys.platform == "win32":
+    if sys.platform == "win32" and arch_name() != "arm64":
+        # (ARM64: no such wheels; build_windows_arm64.py makes kivy_deps.vcpkg)
         pip("kivy_deps.sdl2", "kivy_deps.glew", "kivy_deps.angle")
     dist = os.path.join(ROOT, "dist")
     subprocess.check_call([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",

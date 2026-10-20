@@ -5,6 +5,10 @@ __pycache__/
 .pytest_cache/
 .venv/
 .venv-android/
+.venv-x86/
+.venv-arm64/
+.vcpkg/
+.vcpkg-cache/
 
 # Builds (PyInstaller, buildozer)
 build/

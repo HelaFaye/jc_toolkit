@@ -47,8 +47,14 @@ pyz = PYZ(a.pure)
 
 extra = []
 if sys.platform == "win32":
-    from kivy_deps import angle, glew, sdl2
-    extra = [Tree(p) for p in (sdl2.dep_bins + glew.dep_bins + angle.dep_bins)]
+    # The DLLs of every kivy_deps package: sdl2, glew, angle (the wheels, x86 / x64), or
+    # vcpkg (the ARM64 build, scripts/build_windows_arm64.py)
+    import importlib
+    import pkgutil
+    import kivy_deps
+    for m in pkgutil.iter_modules(kivy_deps.__path__):
+        mod = importlib.import_module("kivy_deps." + m.name)
+        extra += [Tree(p) for p in getattr(mod, "dep_bins", []) if os.path.isdir(p)]
 
 exe = EXE(
     pyz, a.scripts, [],
