@@ -11,7 +11,7 @@ to the run (Actions > the run > Artifacts).
 | Windows ARM64 | Windows on ARM, an ARM64 Python | `python scripts\build_windows_arm64.py` | `...-windows-arm64.zip` |
 | macOS Apple Silicon / Intel | a Mac of that kind | `scripts/setup_venv.sh`, then `.venv/bin/python scripts/build.py desktop` | `...-macos-arm64.zip` / `...-macos-x86_64.zip` |
 | Linux x86_64 / ARM64 | Linux of that kind | the same | `...-linux-x86_64.tar.gz` / `...-linux-arm64.tar.gz` |
-| Linux x86 (32-bit) | Linux x86_64 with Docker | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bullseye sh scripts/build_linux_x86.sh` | `...-linux-x86.tar.gz` |
+| Linux x86 (32-bit) | Linux x86_64 with Docker | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh` | `...-linux-x86.tar.gz` |
 | Android | Linux or macOS (Windows: WSL2) | `python3 scripts/build.py android` | `bin/jctool-<v>-arm64-v8a_armeabi-v7a-debug.apk` |
 | Nintendo Switch | anywhere with Docker, or devkitPro | `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch` | `switch/jctool.nro` |
 
@@ -109,10 +109,12 @@ oldest glibc the runners have (2.35), so the builds run on that and newer.
   screens against an emulated controller.
 
 **x86 (32-bit).** GitHub has no 32-bit runners, and Kivy and python-rtmidi have no 32-bit
-Linux wheels, so `scripts/build_linux_x86.sh` runs in a 32-bit Debian 11 container
-(glibc 2.31) on an x86_64 machine: it installs Debian's SDL2, Mesa and ALSA headers, builds
-Kivy and python-rtmidi from source in `.venv-x86` (Debian 11's Python 3.9), runs the tests,
-builds and self-tests the app. Kivy uses Debian's SDL2 here, which has Wayland support.
+Linux wheels, so `scripts/build_linux_x86.sh` runs in a 32-bit Debian 12 container
+(glibc 2.36) on an x86_64 machine: it installs Debian's SDL2, Mesa and ALSA headers, builds
+Kivy and python-rtmidi from source in `.venv-x86` (Debian 12's Python 3.11), runs the tests,
+builds and self-tests the app. Kivy uses Debian's SDL2 here, which has Wayland support. (Debian 11, with an older glibc, would run on more systems,
+but its support ended in August 2026 and its updates left the mirrors: `apt-get install`
+fails with 404s.)
 Docker Hub limits anonymous image pulls; if `docker run` says "Too Many Requests", wait or
 `docker login`.
 

@@ -20,7 +20,7 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 | macOS (Intel) | `JoyConToolkit-<version>-macos-x86_64.zip` | The same |
 | Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/install.sh` once (controller access and a menu entry, see [Linux](#linux)), then open it from your menu or run `JoyConToolkit/JoyConToolkit` |
 | Linux (64-bit ARM: Raspberry Pi 4/5...) | `JoyConToolkit-<version>-linux-arm64.tar.gz` | The same |
-| Linux (32-bit x86) | `JoyConToolkit-<version>-linux-x86.tar.gz` | The same (glibc 2.31 or newer: Debian 11 and later) |
+| Linux (32-bit x86) | `JoyConToolkit-<version>-linux-x86.tar.gz` | The same (glibc 2.36 or newer: Debian 12 and later, and other current 32-bit distributions) |
 | Android (arm64, armv7) | `jctool-<version>-arm64-v8a_armeabi-v7a-debug.apk` | Install it (allow installing from your browser / file manager) |
 | Nintendo Switch (homebrew) | `JoyConToolkit-<version>-switch.nro` | Copy it to `/switch/` on the SD card, open it from the Homebrew Menu (see [Nintendo Switch](#nintendo-switch)) |
 
@@ -179,7 +179,7 @@ pins python-for-android, and so on). In short:
 |---|---|---|
 | Windows, macOS, Linux | `scripts/setup_venv.sh` (Windows: `scripts\setup_venv.bat`), then `.venv/bin/python scripts/build.py desktop` | `dist/` (a folder or `.app`, and a `.zip` / `.tar.gz`) |
 | Windows ARM64 | `python scripts\build_windows_arm64.py` (an ARM64 Python and Visual Studio's ARM64 tools) | `dist\...-windows-arm64.zip` |
-| Linux x86 (32-bit) | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bullseye sh scripts/build_linux_x86.sh` | `dist/...-linux-x86.tar.gz` |
+| Linux x86 (32-bit) | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh` | `dist/...-linux-x86.tar.gz` |
 | Android | `python3 scripts/build.py android` (Linux or macOS; on Windows use WSL2) | `bin/jctool-<version>-*-debug.apk` |
 | Switch | `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch`, or `make -C switch` with [devkitPro](https://devkitpro.org/wiki/Getting_Started) | `switch/jctool.nro` |
 

@@ -1,9 +1,9 @@
 #!/bin/sh
 # The 32-bit x86 Linux build. Kivy and python-rtmidi have no 32-bit Linux wheels, so they're
-# compiled here, against Debian 11's SDL2 and ALSA. It runs inside a 32-bit Debian 11
-# container (glibc 2.31: the build runs on that and newer), from the repo root:
+# compiled here, against Debian 12's SDL2 and ALSA. It runs inside a 32-bit Debian 12
+# container (glibc 2.36: the build runs on that and newer), from the repo root:
 #
-#   docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bullseye \
+#   docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm \
 #       sh scripts/build_linux_x86.sh
 #
 # Output: dist/JoyConToolkit-<version>-linux-x86.tar.gz, self-tested under Xvfb.

@@ -148,8 +148,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      - name: Build in a 32-bit Debian 11 container (Kivy and python-rtmidi from source)
-        run: docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bullseye sh scripts/build_linux_x86.sh
+      - name: Build in a 32-bit Debian 12 container (Kivy and python-rtmidi from source)
+        run: docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh
       - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-linux-x86
