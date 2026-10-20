@@ -130,13 +130,19 @@ jobs:
         with:
           python-version: "3.12"
           architecture: arm64
-      - uses: actions/cache@v5
+      # vcpkg's binary cache, saved even when the build fails (vcpkg's part takes ~20 minutes)
+      - uses: actions/cache/restore@v5
         with:
           path: .vcpkg-cache
           key: vcpkg-arm64-windows-${{ hashFiles('scripts/build_windows_arm64.py') }}
           restore-keys: vcpkg-arm64-windows-
       - name: Build (SDL2 and GLEW with vcpkg; Kivy, hidapi and python-rtmidi from source)
         run: python scripts/build_windows_arm64.py
+      - uses: actions/cache/save@v5
+        if: always()
+        with:
+          path: .vcpkg-cache
+          key: vcpkg-arm64-windows-${{ hashFiles('scripts/build_windows_arm64.py') }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-windows-arm64

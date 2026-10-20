@@ -129,7 +129,11 @@ def main():
                 "        os.environ['PATH'] = _p + os.pathsep + os.environ.get('PATH', '')\n"
                 "        os.add_dll_directory(_p)\n" % bin_)
 
-    run(py, "-c", "import kivy, kivy.core.window._window_sdl2, kivy.graphics; print('Kivy', kivy.__version__, 'imports')")
+    # Kivy loads (its modules and vcpkg's DLLs). With the mock OpenGL backend: importing
+    # kivy.core.window opens a window, and where there's no OpenGL 2.0 (a CI runner) Kivy
+    # then shows a message box that waits forever
+    check_env = dict(os.environ, KIVY_GL_BACKEND="mock", KIVY_NO_ARGS="1")
+    run(py, "-c", "import kivy, kivy.core.window, kivy.graphics; print('Kivy', kivy.__version__, 'loads')", env=check_env)
     test_env = dict(os.environ, JCTOOL_SKIP_GUI_TEST="1")
     run(py, "-m", "pytest", "-q", "--timeout=300", cwd=ROOT, env=test_env)
     run(py, os.path.join(ROOT, "scripts", "build.py"), "desktop", cwd=ROOT)
