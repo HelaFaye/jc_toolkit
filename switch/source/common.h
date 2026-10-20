@@ -53,7 +53,9 @@ bool ui_text(const char *guide, const char *initial, char *out, size_t size, int
 void ui_swatch(const u8 rgb[3]);         // A block in that color
 const char *rc_text(Result rc);
 
-// ctrl.c: the controllers and their SPI flash
+// ctrl.c: the controllers and their SPI flash. SPI operations that don't finish:
+#define JC_ERR_TIMEOUT MAKERESULT(Module_Libnx, LibnxError_Timeout)
+#define JC_ERR_DISCONNECTED MAKERESULT(Module_Libnx, LibnxError_NotFound)
 int ctrl_list(Ctrl *out, int max);
 bool ctrl_refresh(Ctrl *c);              // Still connected? (and its current Npad)
 const char *ctrl_type_name(int type);

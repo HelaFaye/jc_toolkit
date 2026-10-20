@@ -124,6 +124,10 @@ void ui_swatch(const u8 rgb[3]) {
 
 const char *rc_text(Result rc) {
     static char buf[48];
+    if (rc == JC_ERR_TIMEOUT)
+        return "the controller didn't answer";
+    if (rc == JC_ERR_DISCONNECTED)
+        return "the controller disconnected";
     snprintf(buf, sizeof(buf), "error 2%03d-%04d (0x%X)", R_MODULE(rc), R_DESCRIPTION(rc), rc);
     return buf;
 }

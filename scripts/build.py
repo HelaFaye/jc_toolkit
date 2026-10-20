@@ -61,6 +61,10 @@ def desktop():
     elif sys.platform == "win32":
         out = shutil.make_archive(archive, "zip", dist, "JoyConToolkit")
     else:
+        # Next to the app: the udev rule and the script that installs it and a menu entry
+        linux = os.path.join(ROOT, "packaging", "linux")
+        for name in ("50-nintendo-switch-controllers.rules", "install.sh"):
+            shutil.copy2(os.path.join(linux, name), os.path.join(dist, "JoyConToolkit", name))
         out = shutil.make_archive(archive, "gztar", dist, "JoyConToolkit")
     print("\nBuilt:", out)
 

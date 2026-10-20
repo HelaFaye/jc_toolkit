@@ -23,8 +23,6 @@ spi_*.bin
 # Editors
 .vscode/
 .idea/
-python/run.txt
-linux/mono/jcprobe.exe
-jctool-cli
-run.txt
-jctool/jc_colorpicker/obj/Debug/.NETFramework,Version=v4.7.1.AssemblyAttributes.cs
+# Local files in the repo root
+/jctool-cli
+/run.txt

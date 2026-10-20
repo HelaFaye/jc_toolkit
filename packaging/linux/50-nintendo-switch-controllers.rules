@@ -2,6 +2,7 @@
 # so Joy-Con Toolkit does not need to run as root.
 #
 # Install:
+#   ./install.sh (in the downloaded app's folder), or:
 #   sudo cp 50-nintendo-switch-controllers.rules /etc/udev/rules.d/
 #   sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw
 # Then reconnect the controller.

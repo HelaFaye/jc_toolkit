@@ -24,7 +24,10 @@ from jctool import __version__  # noqa: E402
 
 # Providers named (not True) so that no window is opened while building. x11: Kivy's fallback
 # when SDL can't open a window
-deps = get_deps_minimal(window=["sdl2", "x11"] if sys.platform.startswith("linux") else "sdl2", text="sdl2", clipboard=["sdl2", "dummy"], image=True,
+LINUX = sys.platform.startswith("linux")
+# xclip / xsel: on Linux, Kivy's middle-click paste (its "cutbuffer") uses them
+deps = get_deps_minimal(window=["sdl2", "x11"] if LINUX else "sdl2", text="sdl2",
+                        clipboard=["sdl2", "xclip", "xsel", "dummy"] if LINUX else ["sdl2", "dummy"], image=True,
                         video=None, audio=None, spelling=None, camera=None)
 hidden = deps["hiddenimports"] + ["hid", "mido.backends.rtmidi", "rtmidi"]
 if sys.platform.startswith("linux"):
@@ -36,7 +39,7 @@ a = Analysis(
     datas=[(os.path.join(ROOT, "jctool", "app", "icon.png"), os.path.join("jctool", "app")),
            (os.path.join(ROOT, "jctool", "app", "res"), os.path.join("jctool", "app", "res"))],
     hiddenimports=hidden,
-    excludes=deps["excludes"] + ["pytest", "jnius", "android"],
+    excludes=deps["excludes"] + ["pytest", "jnius", "android", "docutils"],
     hookspath=hookspath(),
     runtime_hooks=runtime_hooks(),
 )
@@ -68,7 +71,9 @@ exe_cli = EXE(
     console=True,
     icon=os.path.join(SPECPATH, "icon.icns" if sys.platform == "darwin" else "icon.ico"),
 )
-coll = COLLECT(exe, exe_cli, a.binaries, a.datas, c.binaries, c.datas, *extra, name=NAME)
+# Linux: without their debug symbols, Kivy's modules are a fraction of the size (macOS
+# isn't stripped: that would break the binaries' signatures)
+coll = COLLECT(exe, exe_cli, a.binaries, a.datas, c.binaries, c.datas, *extra, name=NAME, strip=LINUX)
 
 if sys.platform == "darwin":
     app = BUNDLE(

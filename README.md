@@ -16,7 +16,8 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 | Windows (64-bit) | `JoyConToolkit-<version>-windows-x86_64.zip` | Unzip, run `JoyConToolkit\JoyConToolkit.exe` |
 | Windows (32-bit) | `JoyConToolkit-<version>-windows-x86.zip` | The same (no MIDI devices: python-rtmidi has no 32-bit build; MIDI files work) |
 | macOS (Apple Silicon) | `JoyConToolkit-<version>-macos-arm64.zip` | Unzip, open `Joy-Con Toolkit.app` |
-| Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/JoyConToolkit` (see [Linux](#linux) for permissions) |
+| macOS (Intel) | `JoyConToolkit-<version>-macos-x86_64.zip` | The same |
+| Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/install.sh` once (controller access and a menu entry, see [Linux](#linux)), then open it from your menu or run `JoyConToolkit/JoyConToolkit` |
 | Linux (64-bit ARM: Raspberry Pi 4/5...) | `JoyConToolkit-<version>-linux-arm64.tar.gz` | The same |
 | Android (arm64, armv7) | `jctool-<version>-arm64-v8a_armeabi-v7a-debug.apk` | Install it (allow installing from your browser / file manager) |
 | Nintendo Switch (homebrew) | `JoyConToolkit-<version>-switch.nro` | Copy it to `/switch/` on the SD card, open it from the Homebrew Menu (see [Nintendo Switch](#nintendo-switch)) |
@@ -83,7 +84,10 @@ the app under Privacy & Security > Input Monitoring.
 
 ### Linux
 
-1. Let your user open the controllers: install the udev rule,
+1. Let your user open the controllers: in the downloaded app's folder, run `./install.sh`.
+   It installs the udev rule (`50-nintendo-switch-controllers.rules`, with sudo) and adds
+   Joy-Con Toolkit to your applications menu (`./install.sh --menu-only` skips the rule,
+   `--uninstall` removes both). From source, install the rule by hand:
    `sudo cp packaging/linux/50-nintendo-switch-controllers.rules /etc/udev/rules.d/`, then
    `sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=hidraw`.
 2. Pair the controller with your desktop's Bluetooth settings, or `bluetoothctl`:
@@ -142,7 +146,9 @@ so there's nothing to pair: choose a controller from the list.
 | NFC | A tag's UID and type |
 | HOME LED, SPI flash viewer, Disconnect | |
 
-Its files are in `/switch/jctool/` on the SD card. The Switch applies the controller's
+Its files are in `/switch/jctool/` on the SD card. If a controller stops answering or
+disconnects during an SPI read or write, the operation gives up after a few seconds with
+an error, rather than waiting for it; reconnect the controller and try again. The Switch applies the controller's
 calibration itself, so stick and motion calibration are done in System Settings >
 Controllers and Sensors, and the app offers only the readout and the reset. The Switch
 doesn't let homebrew send the controller raw commands, so there's no player LED control,

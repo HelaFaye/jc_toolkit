@@ -21,8 +21,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: System packages (virtual display for the app's self-test)
@@ -49,11 +49,13 @@ jobs:
             arch: x86
           - os: macos-latest        # Apple Silicon
             name: macos
+          - os: macos-15-intel      # Intel Macs
+            name: macos-intel
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           architecture: ${{ matrix.arch }}
@@ -76,7 +78,7 @@ jobs:
         run: |
           sudo apt-get install -y xvfb libgl1-mesa-dri libmtdev1
           xvfb-run -a -s "-screen 0 1100x800x24" dist/JoyConToolkit/JoyConToolkit --selftest
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-${{ matrix.name }}
           path: |
@@ -88,11 +90,11 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -101,7 +103,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config zlib1g-dev \
             libncurses-dev cmake libffi-dev libssl-dev
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.buildozer
@@ -111,7 +113,7 @@ jobs:
         run: python -m venv .venv
       - name: Build the APK
         run: .venv/bin/python scripts/build.py android
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-android
           path: bin/*.apk
@@ -122,14 +124,14 @@ jobs:
     container: devkitpro/devkita64
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build the homebrew
         run: make -C switch -j4
       - name: Name it like the other downloads
         run: |
           ver=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' jctool/__init__.py)
           mkdir -p out && cp switch/jctool.nro "out/JoyConToolkit-$ver-switch.nro"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-switch
           path: out/*.nro
@@ -141,11 +143,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: out
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           # On a tag push both are empty and the pushed tag is used
           tag_name: ${{ inputs.tag }}
