@@ -9,7 +9,8 @@ python-rtmidi have no Windows ARM64 wheels, so this compiles them:
    Python extensions.
 2. .venv-arm64 gets Kivy built from source against them (without pip's build isolation:
    Kivy's build requirements on Windows include the kivy_deps wheels, which are x86/x64
-   only), hidapi and python-rtmidi from source, and the app.
+   only; and from <drive>:\\kvsrc, a short path: Windows' 260-character limit), hidapi and
+   python-rtmidi from source, and the app.
 3. A kivy_deps.vcpkg package in the venv points Kivy at vcpkg's DLLs, like the kivy_deps
    wheels do on x64: Kivy adds it to the DLL search path when it starts, and the
    PyInstaller spec bundles its DLLs.
@@ -50,6 +51,26 @@ def vcpkg_root():
     return root
 
 
+def kivy_source():
+    """Kivy's sdist, extracted to <drive>:\\kvsrc\\Kivy-<version>."""
+    import json
+    import tarfile
+    import urllib.request
+    version = KIVY.split("==")[1]
+    dest = os.path.join(os.path.splitdrive(ROOT)[0] + os.sep, "kvsrc")
+    src = os.path.join(dest, "Kivy-" + version)
+    if not os.path.isdir(src):
+        with urllib.request.urlopen("https://pypi.org/pypi/kivy/%s/json" % version) as r:
+            url = [u["url"] for u in json.load(r)["urls"] if u["packagetype"] == "sdist"][0]
+        os.makedirs(dest, exist_ok=True)
+        archive = os.path.join(dest, "kivy.tar.gz")
+        print("+ download", url, flush=True)
+        urllib.request.urlretrieve(url, archive)
+        with tarfile.open(archive) as t:
+            t.extractall(dest)
+    return src
+
+
 def main():
     if sys.platform != "win32" or "ARM64" not in sys.version.upper():
         sys.exit("Run this with an ARM64 Python on Windows on ARM (python.org's ARM64 installer).")
@@ -77,7 +98,9 @@ def main():
     # The compiler and linker also read these, whatever environment setuptools sets up
     env["CL"] = ('/I"%s" ' % include) + env.get("CL", "")
     env["LINK"] = ('/LIBPATH:"%s" ' % lib) + env.get("LINK", "")
-    run(*pip, "--no-build-isolation", "--no-deps", "--no-binary", "kivy", KIVY, env=env)
+    # From a short folder: setuptools nests each object file under the source's full path,
+    # and from pip's temp folder some go past Windows' 260-character limit
+    run(*pip, "--no-build-isolation", "--no-deps", kivy_source(), env=env)
     run(*pip, *RUNTIME)
     run(*pip, "--no-deps", "-e", ROOT)
 

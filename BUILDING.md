@@ -66,7 +66,10 @@ skips the `midi` extra: MIDI files work, MIDI devices don't.
    app with `--no-deps`, so that pip doesn't look for `kivy_deps` again). Kivy finds SDL2
    through `KIVY_SDL2_PATH`, and GLEW (`GL/glew.h`, `glew32.lib`) through the compiler's
    paths: the script sets `INCLUDE` / `LIB`, and `CL` / `LINK`, which MSVC reads whatever
-   environment setuptools sets up.
+   environment setuptools sets up. Kivy is built from its source extracted to `C:\kvsrc`
+   (the drive's root), not from pip's temp folder: setuptools puts each object file under
+   the source's full path, and from there some paths go past Windows' 260-character limit
+   (`C1083: Cannot open compiler generated file`, `LNK1104`).
 4. hidapi and python-rtmidi build from their sdists with MSVC (no extra setup).
 5. The script writes a `kivy_deps.vcpkg` package into the venv, like the `kivy_deps`
    wheels: its `dep_bins` is vcpkg's `bin` folder. Kivy imports every `kivy_deps` package
