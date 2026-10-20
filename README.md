@@ -15,7 +15,7 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 |---|---|---|
 | Windows (64-bit) | `JoyConToolkit-<version>-windows-x86_64.zip` | Unzip, run `JoyConToolkit\JoyConToolkit.exe` |
 | Windows (32-bit) | `JoyConToolkit-<version>-windows-x86.zip` | The same (no MIDI devices: python-rtmidi has no 32-bit build; MIDI files work) |
-| Windows on ARM (Snapdragon, Surface Pro X / 11...) | `JoyConToolkit-<version>-windows-arm64.zip` | The same. It needs OpenGL: the "OpenCL, OpenGL, and Vulkan Compatibility Pack" from the Microsoft Store, preinstalled on most. (The x64 build also runs, emulated) |
+| Windows on ARM (Snapdragon, Surface Pro X / 11...) | `JoyConToolkit-<version>-windows-arm64.zip` | The same (native; it draws through Direct3D, so it needs no OpenGL driver. The x64 build also runs, emulated) |
 | macOS (Apple Silicon) | `JoyConToolkit-<version>-macos-arm64.zip` | Unzip, open `Joy-Con Toolkit.app` |
 | macOS (Intel) | `JoyConToolkit-<version>-macos-x86_64.zip` | The same |
 | Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/install.sh` once (controller access and a menu entry, see [Linux](#linux)), then open it from your menu or run `JoyConToolkit/JoyConToolkit` |

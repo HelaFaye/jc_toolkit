@@ -16,6 +16,28 @@ if (sys.platform.startswith("linux") and "wayland" in os.environ.get("SDL_VIDEOD
         and os.environ.get("DISPLAY")):
     os.environ["SDL_VIDEODRIVER"] = "x11"
 
+
+def _angle_on_windows_arm64():
+    """The Windows ARM64 build ships ANGLE (OpenGL ES over Direct3D 11): use it, so that the
+    app runs without an OpenGL driver (many Windows on ARM PCs have none until the
+    "OpenCL, OpenGL, and Vulkan Compatibility Pack" is installed). KIVY_GL_BACKEND wins."""
+    if sys.platform != "win32" or os.environ.get("KIVY_GL_BACKEND"):
+        return
+    import platform
+    if platform.machine().upper() != "ARM64":
+        return
+    dirs = [getattr(sys, "_MEIPASS", "")]          # The packaged app
+    try:
+        from kivy_deps import vcpkg                # A venv from build_windows_arm64.py
+        dirs += vcpkg.dep_bins
+    except Exception:
+        pass
+    if any(d and os.path.isfile(os.path.join(d, "libEGL.dll")) for d in dirs):
+        os.environ["KIVY_GL_BACKEND"] = "angle_sdl2"
+
+
+_angle_on_windows_arm64()
+
 from kivy.app import App                                   # noqa: E402
 from kivy.clock import Clock                               # noqa: E402
 from kivy.core.window import Window                        # noqa: E402

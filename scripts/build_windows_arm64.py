@@ -3,7 +3,7 @@ python-rtmidi have no Windows ARM64 wheels, so this compiles them:
 
     python scripts\\build_windows_arm64.py        (an ARM64 Python 3.10+, on Windows on ARM)
 
-1. vcpkg builds SDL2, SDL2_image, SDL2_ttf, SDL2_mixer and GLEW for arm64-windows
+1. vcpkg builds SDL2, SDL2_image, SDL2_ttf, SDL2_mixer, GLEW and ANGLE for arm64-windows
    (VCPKG_ROOT or VCPKG_INSTALLATION_ROOT if set, else a clone in .vcpkg). Visual Studio
    2022 (or its Build Tools) with the ARM64 C++ tools is needed, for vcpkg and for the
    Python extensions.
@@ -14,7 +14,8 @@ python-rtmidi have no Windows ARM64 wheels, so this compiles them:
 3. A kivy_deps.vcpkg package in the venv points Kivy at vcpkg's DLLs, like the kivy_deps
    wheels do on x64: Kivy adds it to the DLL search path when it starts, and the
    PyInstaller spec bundles its DLLs.
-4. The tests, then scripts/build.py desktop: dist\\JoyConToolkit-<version>-windows-arm64.zip.
+4. The tests, scripts/build.py desktop (dist\\JoyConToolkit-<version>-windows-arm64.zip),
+   then the app's self-test.
 """
 import os
 import shutil
@@ -24,7 +25,9 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 VENV = os.path.join(ROOT, ".venv-arm64")
 TRIPLET = "arm64-windows"
-PORTS = ["sdl2", "sdl2-image[libjpeg-turbo]", "sdl2-ttf", "sdl2-mixer", "glew"]
+# angle: OpenGL ES over Direct3D 11 (libEGL.dll, libGLESv2.dll), which the app uses on
+# ARM64 (jctool/app/main.py), so it doesn't need an OpenGL driver
+PORTS = ["sdl2", "sdl2-image[libjpeg-turbo]", "sdl2-ttf", "sdl2-mixer", "glew", "angle"]
 KIVY = "kivy==2.3.1"
 # Kivy's own build requirements (its pyproject.toml), minus the kivy_deps wheels
 KIVY_BUILD = ["setuptools~=69.2.0", "wheel~=0.44.0", "packaging~=24.0", "cython>=0.29.1,<=3.0.11"]
@@ -137,6 +140,9 @@ def main():
     test_env = dict(os.environ, JCTOOL_SKIP_GUI_TEST="1")
     run(py, "-m", "pytest", "-q", "--timeout=300", cwd=ROOT, env=test_env)
     run(py, os.path.join(ROOT, "scripts", "build.py"), "desktop", cwd=ROOT)
+    # The app's self-test, through ANGLE (on a machine without a GPU, Direct3D's software
+    # renderer). From the venv: the packaged app has no console to report to
+    run(py, "-m", "jctool.app", "--selftest", cwd=ROOT, timeout=600)
     print("\nvcpkg DLLs:", bin_, "\nDone:", [f for f in os.listdir(os.path.join(ROOT, "dist")) if f.endswith(".zip")])
 
 

@@ -56,10 +56,11 @@ skips the `midi` extra: MIDI files work, MIDI devices don't.
 
 1. You need an ARM64 Python (python.org's ARM64 installer; 3.12 in CI), Visual Studio 2022
    or its Build Tools with the "C++ ARM64 build tools", and git.
-2. vcpkg builds SDL2, SDL2_image (with libjpeg-turbo), SDL2_ttf, SDL2_mixer and GLEW for
-   `arm64-windows`. It uses `VCPKG_ROOT` or `VCPKG_INSTALLATION_ROOT` if set, else clones
-   vcpkg into `.vcpkg`. The first build takes a while; CI keeps vcpkg's binary cache
-   (`VCPKG_DEFAULT_BINARY_CACHE`, `.vcpkg-cache`) between runs.
+2. vcpkg builds SDL2, SDL2_image (with libjpeg-turbo), SDL2_ttf, SDL2_mixer, GLEW and
+   ANGLE for `arm64-windows`. It uses `VCPKG_ROOT` or `VCPKG_INSTALLATION_ROOT` if set, else clones
+   vcpkg into `.vcpkg`. The first build takes a while (ANGLE most of it); CI keeps vcpkg's
+   binary cache (`VCPKG_DEFAULT_BINARY_CACHE`, `.vcpkg-cache`) between runs, saved even when
+   the job fails.
 3. Kivy 2.3.1 is built from source with `--no-build-isolation --no-deps`: on Windows its
    build requirements and its requirements include the `kivy_deps` wheels, which are
    x86/x64 only. Its other requirements, and the app's, are installed separately (and the
@@ -84,10 +85,21 @@ skips the `midi` extra: MIDI files work, MIDI devices don't.
    doesn't use PATH for an extension's DLLs), and the spec bundles every package's
    `dep_bins`.
 
-At run time this build uses desktop OpenGL (GLEW) like the x64 one, so it needs an OpenGL
-2.0 driver. Windows on ARM PCs get OpenGL through the "OpenCL, OpenGL, and Vulkan
-Compatibility Pack" (Microsoft Store), preinstalled on most; without it Kivy says it can't
-find OpenGL 2.0. The x64 build also runs on Windows on ARM, emulated.
+6. The tests, the build, then the app's self-test from the venv (the packaged app has no
+   console to report to).
+
+At run time this build draws through ANGLE (OpenGL ES over Direct3D 11, vcpkg's
+`libEGL.dll` / `libGLESv2.dll`, bundled with the app): `jctool/app/main.py` sets
+`KIVY_GL_BACKEND=angle_sdl2` on Windows ARM64 when those DLLs are there. Kivy's default on
+Windows is desktop OpenGL through GLEW, and many Windows on ARM PCs have no OpenGL driver
+until the "OpenCL, OpenGL, and Vulkan Compatibility Pack" is installed: without one, Kivy
+says it can't find OpenGL 2.0. Direct3D works everywhere, including the CI runner (its
+software renderer), so CI runs the self-test there too. `KIVY_GL_BACKEND=glew` picks
+desktop OpenGL instead. The x64 build also runs on Windows on ARM, emulated.
+
+Kivy opens its window when `kivy.core.window` is imported, and where there's no OpenGL 2.0
+it then shows a message box that waits forever: anything that imports Kivy on a runner
+without a GPU (the build script's check, the spec) uses `KIVY_GL_BACKEND=mock`.
 
 ## macOS
 
