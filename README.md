@@ -15,10 +15,12 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 |---|---|---|
 | Windows (64-bit) | `JoyConToolkit-<version>-windows-x86_64.zip` | Unzip, run `JoyConToolkit\JoyConToolkit.exe` |
 | Windows (32-bit) | `JoyConToolkit-<version>-windows-x86.zip` | The same (no MIDI devices: python-rtmidi has no 32-bit build; MIDI files work) |
+| Windows on ARM (Snapdragon, Surface Pro X / 11...) | `JoyConToolkit-<version>-windows-arm64.zip` | The same. It needs OpenGL: the "OpenCL, OpenGL, and Vulkan Compatibility Pack" from the Microsoft Store, preinstalled on most. (The x64 build also runs, emulated) |
 | macOS (Apple Silicon) | `JoyConToolkit-<version>-macos-arm64.zip` | Unzip, open `Joy-Con Toolkit.app` |
 | macOS (Intel) | `JoyConToolkit-<version>-macos-x86_64.zip` | The same |
 | Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/install.sh` once (controller access and a menu entry, see [Linux](#linux)), then open it from your menu or run `JoyConToolkit/JoyConToolkit` |
 | Linux (64-bit ARM: Raspberry Pi 4/5...) | `JoyConToolkit-<version>-linux-arm64.tar.gz` | The same |
+| Linux (32-bit x86) | `JoyConToolkit-<version>-linux-x86.tar.gz` | The same (glibc 2.31 or newer: Debian 11 and later) |
 | Android (arm64, armv7) | `jctool-<version>-arm64-v8a_armeabi-v7a-debug.apk` | Install it (allow installing from your browser / file manager) |
 | Nintendo Switch (homebrew) | `JoyConToolkit-<version>-switch.nro` | Copy it to `/switch/` on the SD card, open it from the Homebrew Menu (see [Nintendo Switch](#nintendo-switch)) |
 
@@ -169,32 +171,22 @@ Or by hand: `python3 -m venv .venv`, then `.venv/bin/pip install -e ".[midi,test
 
 ## Building
 
-Every build starts from the venv. PyInstaller builds only for the system it runs on; the
-`Build` workflow (`.github/workflows/build.yml`) runs the tests and builds them all on
-GitHub Actions with each push, and a `v*` tag (or a manual run given a tag) publishes them
-as a release.
+[BUILDING.md](BUILDING.md) has every target: the commands, what each one needs, and what's
+unusual about it (the 32-bit and ARM64 builds compile Kivy from source, the Android build
+pins python-for-android, and so on). In short:
 
 | Target | Command | Output |
 |---|---|---|
-| Linux | `.venv/bin/python scripts/build.py desktop` | `dist/JoyConToolkit/` and a `.tar.gz` |
-| Windows | `.venv\Scripts\python scripts\build.py desktop` | `dist\JoyConToolkit\JoyConToolkit.exe` and a `.zip` |
-| macOS | `.venv/bin/python scripts/build.py desktop` | `dist/Joy-Con Toolkit.app` and a `.zip` |
-| Android | `.venv/bin/python scripts/build.py android` (Linux or macOS; on Windows use WSL2) | `bin/jctool-<version>-*-debug.apk` |
-| Switch | `make -C switch` with [devkitPro](https://devkitpro.org/wiki/Getting_Started)'s devkitA64 and libnx, or `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch` | `switch/jctool.nro` |
+| Windows, macOS, Linux | `scripts/setup_venv.sh` (Windows: `scripts\setup_venv.bat`), then `.venv/bin/python scripts/build.py desktop` | `dist/` (a folder or `.app`, and a `.zip` / `.tar.gz`) |
+| Windows ARM64 | `python scripts\build_windows_arm64.py` (an ARM64 Python and Visual Studio's ARM64 tools) | `dist\...-windows-arm64.zip` |
+| Linux x86 (32-bit) | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bullseye sh scripts/build_linux_x86.sh` | `dist/...-linux-x86.tar.gz` |
+| Android | `python3 scripts/build.py android` (Linux or macOS; on Windows use WSL2) | `bin/jctool-<version>-*-debug.apk` |
+| Switch | `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch`, or `make -C switch` with [devkitPro](https://devkitpro.org/wiki/Getting_Started) | `switch/jctool.nro` |
 
-- Desktop builds use `packaging/jctool.spec` (PyInstaller). The packaged app saves its files
-  in `Documents/Joy-Con Toolkit`.
-- Android builds use `buildozer.spec` (buildozer / python-for-android), from their own
-  `.venv-android`. The first build downloads the Android SDK and NDK (a few GB, in
-  `~/.buildozer`) and takes a while. It needs Java 17 and, on Debian/Ubuntu: `sudo apt
-  install git zip unzip autoconf automake libtool pkg-config zlib1g-dev libncurses-dev cmake
-  libffi-dev libssl-dev`. The Bluetooth helper is compiled with the NDK's clang for each of
-  the APK's ABIs before buildozer packs the app (`scripts/build.py helper` compiles only it).
-  `scripts/build.py android release` makes an unsigned release APK/AAB to sign.
-- A 32-bit Python on Windows builds the 32-bit app: `setup_venv.bat` and `build.py` pick
-  Kivy 2.3.0 (the last with 32-bit wheels, `packaging/constraints-win32.txt`).
-- `tools/make_icons.py` redraws the icons; `tools/gen_tables.py` regenerates
-  `jctool/tables.py` from the original's C headers in `tools/headers`.
+The `Build` workflow runs the tests and builds them all on GitHub Actions with each push;
+a `v*` tag (or a manual run given a tag) publishes them as a release.
+`tools/make_icons.py` redraws the icons; `tools/gen_tables.py` regenerates
+`jctool/tables.py` from the original's C headers in `tools/headers`.
 
 ## Tests
 
