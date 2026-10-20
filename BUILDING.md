@@ -69,7 +69,10 @@ skips the `midi` extra: MIDI files work, MIDI devices don't.
    environment setuptools sets up. Kivy is built from its source extracted to `C:\kvsrc`
    (the drive's root), not from pip's temp folder: setuptools puts each object file under
    the source's full path, and from there some paths go past Windows' 260-character limit
-   (`C1083: Cannot open compiler generated file`, `LNK1104`).
+   (`C1083: Cannot open compiler generated file`, `LNK1104`). For the same reason the script
+   sets `TEMP` / `TMP` to `C:\t` for every build (hidapi's failed the same way from the
+   user profile's temp folder); enabling long paths in Windows doesn't help, MSVC doesn't
+   support them.
 4. hidapi and python-rtmidi build from their sdists with MSVC. python-rtmidi builds with
    meson, which takes the first compiler on PATH unless told otherwise: on the GitHub
    runner that's MinGW's gcc for x86_64, which can't link against an ARM64 Python

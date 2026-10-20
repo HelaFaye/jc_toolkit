@@ -77,6 +77,12 @@ def kivy_source():
 def main():
     if sys.platform != "win32" or "ARM64" not in sys.version.upper():
         sys.exit("Run this with an ARM64 Python on Windows on ARM (python.org's ARM64 installer).")
+    # A short temp folder for every build: setuptools nests object files under the source's
+    # full path, and from pip's temp folder in the user profile some go past Windows'
+    # 260-character limit (MSVC doesn't support longer ones, whatever Windows allows)
+    tmp = os.path.join(os.path.splitdrive(ROOT)[0] + os.sep, "t")
+    os.makedirs(tmp, exist_ok=True)
+    os.environ["TMP"] = os.environ["TEMP"] = tmp
     cache = os.environ.get("VCPKG_DEFAULT_BINARY_CACHE")
     if cache:
         os.makedirs(cache, exist_ok=True)      # vcpkg wants it to exist
