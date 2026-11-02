@@ -4,6 +4,7 @@
     .venv/bin/python scripts/build.py android     # An APK (on Linux or macOS), with buildozer
     .venv/bin/python scripts/build.py android release
     .venv/bin/python scripts/build.py helper      # Only the Bluetooth helper (needs the NDK)
+    python3 scripts/build.py ppc                  # The command line for PowerPC Macs (source)
 
 Desktop builds go to dist/ (a folder, and a .zip / .tar.gz of it); PyInstaller builds only
 for the system it runs on. Android builds go to bin/.
@@ -135,9 +136,45 @@ def android(mode="debug"):
     print("\nBuilt: the APK in", os.path.join(ROOT, "bin"))
 
 
+# The modules the command line uses (not the app's Kivy front end, Android's, or Linux's
+# hidraw helper)
+PPC_SKIP = ("app", "android_hid.py", "android_usb.py", "hidraw_bridge.py", "native", "__pycache__")
+
+
+def ppc():
+    """dist/JoyConToolkit-<version>-macos-ppc.zip: the command line as Python source, with a
+    launcher (packaging/macos-ppc), for PowerPC Macs (Leopard, Python 3.9+ from MacPorts):
+    neither Kivy nor PyInstaller builds there. Any system can make it."""
+    import zipfile
+    dist = os.path.join(ROOT, "dist")
+    os.makedirs(dist, exist_ok=True)
+    out = os.path.join(dist, "JoyConToolkit-%s-macos-ppc.zip" % __version__)
+    top = "JoyConToolkit-ppc"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        def add(src, arc, mode=0o644):
+            info = zipfile.ZipInfo(arc, date_time=(2024, 1, 1, 0, 0, 0))
+            info.external_attr = (0o100000 | mode) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            with open(src, "rb") as f:
+                z.writestr(info, f.read())
+        pkg = os.path.join(ROOT, "jctool")
+        for name in sorted(os.listdir(pkg)):
+            if name in PPC_SKIP or not name.endswith(".py"):
+                continue
+            add(os.path.join(pkg, name), "%s/jctool/%s" % (top, name))
+        ppc_dir = os.path.join(ROOT, "packaging", "macos-ppc")
+        add(os.path.join(ppc_dir, "jctool-cli"), top + "/jctool-cli", 0o755)
+        add(os.path.join(ppc_dir, "README-PowerPC.txt"), top + "/README-PowerPC.txt")
+        add(os.path.join(ROOT, "LICENSE"), top + "/LICENSE")
+    print("\nBuilt:", out)
+
+
 def main():
-    check_venv()
     what = sys.argv[1] if len(sys.argv) > 1 else "desktop"
+    if what == "ppc":
+        ppc()
+        return
+    check_venv()
     if what == "desktop":
         desktop()
     elif what == "android":

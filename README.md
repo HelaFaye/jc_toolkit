@@ -18,6 +18,7 @@ Ready-made builds are on the [Releases page](https://github.com/HelaFaye/jc_tool
 | Windows on ARM (Snapdragon, Surface Pro X / 11...) | `JoyConToolkit-<version>-windows-arm64.zip` | The same (native; it draws through Direct3D, so it needs no OpenGL driver. The x64 build also runs, emulated) |
 | macOS (Apple Silicon) | `JoyConToolkit-<version>-macos-arm64.zip` | Unzip, open `Joy-Con Toolkit.app` |
 | macOS (Intel) | `JoyConToolkit-<version>-macos-x86_64.zip` | The same |
+| macOS (PowerPC, 10.5 Leopard) | `JoyConToolkit-<version>-macos-ppc.zip` | The command line only, as Python source: needs Python 3.9+ (MacPorts' `python310`); unzip, run `JoyConToolkit-ppc/jctool-cli` (see its README-PowerPC.txt). Untested on PowerPC hardware |
 | Linux (x86_64) | `JoyConToolkit-<version>-linux-x86_64.tar.gz` | Extract, run `JoyConToolkit/install.sh` once (controller access and a menu entry, see [Linux](#linux)), then open it from your menu or run `JoyConToolkit/JoyConToolkit` |
 | Linux (64-bit ARM: Raspberry Pi 4/5...) | `JoyConToolkit-<version>-linux-arm64.tar.gz` | The same |
 | Linux (32-bit x86) | `JoyConToolkit-<version>-linux-x86.tar.gz` | The same (glibc 2.36 or newer: Debian 12 and later, and other current 32-bit distributions) |

@@ -35,13 +35,17 @@ def is_android():
 def hid_module():
     """The HID backend: a module with enumerate(vid, pid) and device(), or None when there is
     none. JCTOOL_HID_BACKEND=hidraw|libusb picks a hidapi module on Linux, =bridge the
-    native hidraw helper (what Android uses for Bluetooth)."""
+    native hidraw helper (what Android uses for Bluetooth), =iokit jctool.iokit_hid on
+    macOS (what a Mac without the hidapi package uses)."""
     if is_android():
         from . import android_hid
         return android_hid
     if os.environ.get("JCTOOL_HID_BACKEND") == "bridge":
         from . import hidraw_bridge
         return hidraw_bridge
+    if sys.platform == "darwin" and os.environ.get("JCTOOL_HID_BACKEND") == "iokit":
+        from . import iokit_hid
+        return iokit_hid
     names = ["hid"]
     if sys.platform.startswith("linux"):
         names = ["hid", "hidraw"] if os.environ.get("JCTOOL_HID_BACKEND") == "libusb" else ["hidraw", "hid"]
@@ -50,6 +54,10 @@ def hid_module():
             return importlib.import_module(name)
         except ImportError:
             pass
+    if sys.platform == "darwin":
+        # No hidapi package (a PowerPC Mac, running from source): IOKit through ctypes
+        from . import iokit_hid
+        return iokit_hid
     return None
 
 

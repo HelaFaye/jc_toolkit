@@ -12,6 +12,7 @@ to the run (Actions > the run > Artifacts).
 | macOS Apple Silicon / Intel | a Mac of that kind | `scripts/setup_venv.sh`, then `.venv/bin/python scripts/build.py desktop` | `...-macos-arm64.zip` / `...-macos-x86_64.zip` |
 | Linux x86_64 / ARM64 | Linux of that kind | the same | `...-linux-x86_64.tar.gz` / `...-linux-arm64.tar.gz` |
 | Linux x86 (32-bit) | Linux x86_64 with Docker | `docker run --rm --security-opt seccomp=unconfined --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh` | `...-linux-x86.tar.gz` |
+| macOS PowerPC (command line) | anywhere | `python3 scripts/build.py ppc` | `dist/...-macos-ppc.zip` |
 | Android | Linux or macOS (Windows: WSL2) | `python3 scripts/build.py android` | `bin/jctool-<v>-arm64-v8a_armeabi-v7a-debug.apk` |
 | Nintendo Switch | anywhere with Docker, or devkitPro | `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch` | `switch/jctool.nro` |
 
@@ -112,6 +113,24 @@ attributes (a plain zip breaks it). The binaries aren't stripped: that would inv
 their (ad hoc) signatures. The builds aren't notarized: Gatekeeper asks you to confirm
 (right-click > Open, or `xattr -dr com.apple.quarantine "Joy-Con Toolkit.app"`), and the
 first time, macOS may ask to allow Input Monitoring.
+
+**PowerPC (Mac OS X 10.5 Leopard): the command line, as source.** There's no app for
+PowerPC Macs: Kivy needs SDL2, which dropped PowerPC and 10.5, PyInstaller has no PowerPC
+bootloader, and there are no PowerPC runners (or a redistributable 10.5 SDK to cross-build
+with). What runs there is the command line on Python 3.9+, which MacPorts builds on PowerPC
+Leopard (`python310`; its 3.11 has open build bugs there, MacPorts #69319 and #69320).
+
+- `scripts/build.py ppc` zips the command line's modules (not `jctool/app` or the Android
+  and hidraw ones) with `packaging/macos-ppc`'s launcher (`jctool-cli`: the newest Python
+  3.9+ it finds) and README. Any system can make it; CI makes it in the `macos-ppc` job.
+- Without the hidapi package (it would have to be compiled there), `jctool.hidio` uses
+  `jctool/iokit_hid.py`: IOKit's IOHIDManager (10.5+) through ctypes, with hidapi's
+  interface. CI tests it on the Intel Mac runner (`tests/test_iokit_hid.py`);
+  `JCTOOL_HID_BACKEND=iokit` picks it on any Mac.
+- PowerPC is big-endian, the other builds little-endian: the `macos-ppc` job runs the tests
+  on big-endian Linux (s390x under QEMU, `tonistiigi/binfmt`) with Python 3.10. The protocol
+  code uses explicit byte orders (`struct` with `<`/`>`, `int.from_bytes(..., "little")`).
+- It hasn't run on PowerPC hardware.
 
 ## Linux
 

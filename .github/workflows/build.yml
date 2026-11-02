@@ -161,6 +161,30 @@ jobs:
           name: JoyConToolkit-linux-x86
           path: dist/*.tar.gz
 
+  macos-ppc:
+    # PowerPC Macs: the command line as source (Kivy and PyInstaller don't build there).
+    # Tested on big-endian Linux (s390x, emulated): PowerPC Macs are big-endian, the
+    # other builds all little-endian. Python 3.10: what MacPorts builds on PowerPC Leopard.
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - name: QEMU for s390x containers
+        run: docker run --privileged --rm tonistiigi/binfmt --install s390x
+      - name: Tests on big-endian Python 3.10
+        run: |
+          docker run --rm --platform linux/s390x -v "$PWD":/src -w /src -e JCTOOL_SKIP_GUI_TEST=1 python:3.10-slim sh -c \
+            'python -c "import sys; assert sys.byteorder == \"big\", sys.byteorder; print(sys.byteorder, sys.version)" &&
+             pip install -q pytest pytest-timeout &&
+             python -m pytest -q -p no:cacheprovider --timeout=900 tests'
+      - name: Package
+        run: python3 scripts/build.py ppc
+      - uses: actions/upload-artifact@v6
+        with:
+          name: JoyConToolkit-macos-ppc
+          path: dist/*.zip
+
   switch:
     needs: test
     runs-on: ubuntu-latest
@@ -181,7 +205,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
-    needs: [desktop, windows-arm64, linux-x86, android, switch]
+    needs: [desktop, windows-arm64, linux-x86, macos-ppc, android, switch]
     runs-on: ubuntu-latest
     permissions:
       contents: write

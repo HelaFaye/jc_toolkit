@@ -1,0 +1,17 @@
+#!/bin/sh
+# Joy-Con Toolkit's command line on a PowerPC Mac (or any Mac with Python 3.9+): runs the
+# jctool package next to this script with the newest Python 3 it finds.
+#   ./jctool-cli            the menu
+#   ./jctool-cli -l         the HID devices
+#   PYTHON=/opt/local/bin/python3.10 ./jctool-cli
+here=$(cd "$(dirname "$0")" && pwd)
+for py in "$PYTHON" python3.12 python3.11 python3.10 python3.9 python3 /opt/local/bin/python3.10 /usr/local/bin/python3; do
+    [ -n "$py" ] || continue
+    if command -v "$py" >/dev/null 2>&1 && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 9))' 2>/dev/null; then
+        PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$py" -m jctool.cli "$@"
+    fi
+done
+echo "Joy-Con Toolkit needs Python 3.9 or newer. On a PowerPC Mac: MacPorts, then"
+echo "  sudo port install python310"
+echo "(see README-PowerPC.txt)."
+exit 1
