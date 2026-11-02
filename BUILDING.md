@@ -36,6 +36,8 @@ commit it ran on. The release job waits for every build: if one fails, nothing i
   Kivy shows a "The application will leave now" message box that waits forever.
 - Kivy's providers are named (`get_deps_minimal`), so that no window opens while building.
 - The packaged app saves its files in `Documents/Joy-Con Toolkit`.
+- On Linux the spec bundles jeepney (pure Python, D-Bus) for the desktop portal's color
+  picker; the screen eyedropper's other backends are ctypes (Xlib, GDI) or `osascript`.
 
 ## Windows
 

@@ -26,7 +26,7 @@ class SelfTest:
 
     # A step: fn() returns None when done, or a (condition, seconds) to wait for first
     def start(self):
-        self.steps = [self.connected, self.colors, self.eyedropper, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
+        self.steps = [self.connected, self.colors, self.eyedropper, self.restore_check, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
                       self.backup, self.midi_file, self.tune, self.finish]
         Clock.schedule_once(lambda dt: self.next(), 1.0)
 
@@ -273,6 +273,40 @@ class SelfTest:
                 self.next()
             Clock.schedule_once(lambda dt: take(), 0.3)
         Clock.schedule_once(lambda dt: tap(), 0.5)
+
+    def restore_check(self):
+        """Restoring another controller's backup: refused with a warning, unless "Bypass the
+        backup check" is checked (then the warning is in the confirmation)."""
+        from .. import ops
+        from . import panels
+        app = self.app
+        app.show("Backup")
+        b = app.panels["Backup"]
+        data = bytearray(self.fake.spi)
+        data[0x15] ^= 0xFF                             # Another controller's MAC
+        data[0x6050:0x6053] = b"\x0B\x0C\x0D"
+        backup = ops.Backup(bytes(data))
+        b.backup_data = backup
+        b.backup_problems = backup.problems(self.fake.type, ops.device_info(app.jc).mac_bytes)[1]
+        b.update_buttons()
+        shown, confirmed = [], []
+        real_message, real_confirm = panels.message, panels.confirm
+        panels.message = lambda title, text, *a, **k: shown.append(text)
+        panels.confirm = lambda title, text, yes, *a, **k: (confirmed.append(text), yes())
+        b.chk_bypass.active = False
+        b.restore("colors")
+        refused = bool(shown) and "Bypass the backup check" in shown[-1] and not confirmed
+        b.chk_bypass.active = True
+        b.restore("colors")
+
+        def done():
+            panels.message, panels.confirm = real_message, real_confirm
+            b.chk_bypass.active = False
+            self.check(refused and confirmed and "bypassed" in confirmed[-1] and
+                       bytes(self.fake.spi[0x6050:0x6053]) == b"\x0B\x0C\x0D",
+                       "restore: another controller's backup refused, then restored with the check bypassed")
+            self.next()
+        self.wait(lambda: bytes(self.fake.spi[0x6050:0x6053]) == b"\x0B\x0C\x0D", 5, done)
 
     def debug_guard(self):
         """Expert mode: the SPI subcommands are refused without it."""

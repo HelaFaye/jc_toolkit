@@ -627,24 +627,30 @@ class Cli:
         if data is None:
             return
         backup = ops.Backup(data)
-        err, same_mac = backup.check(jc.type, ops.device_info(jc).mac_bytes)
-        if err:
-            print("[-] " + err.replace("\n", "\n    "))
+        fatal, problems = backup.problems(jc.type, ops.device_info(jc).mac_bytes)
+        if fatal:
+            print("[-] " + fatal)
             return
         print("Backup of %s loaded." % backup.mac_text())
-        allow_full = True
-        if not same_mac:
-            print('Different BT MAC address! The SPI backup is from another "%s".' % TYPE_NAMES[jc.type])
-            if not self.ask_yes_no("Do you want to continue?"):
+        bypass = False
+        if problems:
+            print("[!] This backup doesn't match your controller:")
+            for p in problems:
+                print("    " + p)
+            print("    It's refused unless you bypass the backup check.")
+            bypass = self.ask_yes_no("Bypass the backup check and restore it anyway?")
+            if not bypass:
+                print("[-] Nothing was written.")
                 return
-            allow_full = False
         print("\n 1. Restore Color\n 2. Restore S/N\n 3. Restore user calibration\n 4. Factory reset user calibration")
-        print(" 5. Full restore (factory configuration and user calibration)" if allow_full else
-              " 5. Full restore: disabled, the backup does not match your device")
+        print(" 5. Full restore (factory configuration and user calibration)")
         print(" 0. Back")
         choice = self.ask_int("Select", 0, 0, 5)
-        if choice == 0 or (choice == 5 and not allow_full):
+        if choice == 0:
             return
+        if choice == 5 and bypass:
+            print("[!] A full restore gives this controller the other one's factory configuration: its type, S/N,\n"
+                  "    calibration and colors.")
         l = r = s = False
         if choice in (3, 4):
             l = jc.type != JOYCON_R and self.ask_yes_no("  Left stick calibration?")

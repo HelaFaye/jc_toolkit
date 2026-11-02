@@ -75,6 +75,23 @@ def test_backup_then_restore_colors(capsys, monkeypatch, tmp_path):
     assert bytes(fake.spi[0x6050:0x6053]) == b"\x01\x02\x03"
 
 
+def test_restore_of_another_controllers_backup(capsys, monkeypatch, tmp_path):
+    """Refused (nothing written) unless the check is bypassed; then even a full restore."""
+    out, fake = run(capsys, monkeypatch, tmp_path, ["8"])
+    path = tmp_path / "spi_right_98B6E9123456.bin"
+    data = bytearray(path.read_bytes())
+    data[0x15] ^= 0xFF                       # Another controller's MAC
+    data[0x6050:0x6053] = b"\x01\x02\x03"
+    path.write_bytes(bytes(data))
+    out, _ = run(capsys, monkeypatch, tmp_path, ["9", str(path), "n"], before=reuse(fake))
+    assert "Different BT MAC address!" in out and "[-] Nothing was written." in out
+    assert bytes(fake.spi[0x6050:0x6053]).hex() == "ff3c28"
+    out, _ = run(capsys, monkeypatch, tmp_path, ["9", str(path), "y", "1", "y"], before=reuse(fake))
+    assert "[+] The colors were restored!" in out and bytes(fake.spi[0x6050:0x6053]) == b"\x01\x02\x03"
+    out, _ = run(capsys, monkeypatch, tmp_path, ["9", str(path), "y", "5", "y"], before=reuse(fake))
+    assert "the other one's factory configuration" in out and "[+] The full restore was completed!" in out
+
+
 def test_restore_refuses_a_partial_backup(capsys, monkeypatch, tmp_path):
     (tmp_path / "small.bin").write_bytes(b"\x00" * 100)
     out, _ = run(capsys, monkeypatch, tmp_path, ["9", "small.bin"])

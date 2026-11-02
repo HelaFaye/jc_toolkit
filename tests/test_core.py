@@ -82,6 +82,10 @@ def test_backup_checks_and_restores(right, left):
     other[0x15] = 0
     assert ops.Backup(other).check(JOYCON_R, mac) == (None, False)
     assert ops.Backup(backup).check(JOYCON_R, mac) == (None, True)
+    assert ops.Backup(backup).problems(JOYCON_R, mac) == (None, [])
+    fatal, found = ops.Backup(corrupt).problems(JOYCON_L, mac[:5] + b"\x00")
+    assert fatal is None and [p.split("!")[0] for p in found] == ["Wrong backup", "Corrupt backup", "Different BT MAC address"]
+    assert ops.Backup(backup[:1000]).problems(JOYCON_R, mac)[0].startswith("Partial")
 
     colors = bytearray(backup)
     colors[0x6050:0x6053] = b"\x11\x22\x33"

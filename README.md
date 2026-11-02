@@ -35,8 +35,8 @@ info, Run anyway), and macOS may say the app can't be checked (right-click it, O
 
 | Screen | What it does |
 |---|---|
-| Device | The controller in its colors; read and write body, button (and Pro Controller grip) colors, with the retail and pastel presets and your own saved colors; player LEDs; rumble test |
-| Backup | SPI flash backup (512KB); restore colors, S/N, user calibration, factory reset of the user calibration, or a full restore, with the original's checks (partial, wrong type, corrupt, another controller) |
+| Device | The controller in its colors; read and write body, button (and Pro Controller grip) colors: every official color as a preset (retail, special editions, the Pro Controller editions with their grips), your own saved colors, and an eyedropper (from the screen, or from an image); player LEDs; rumble test |
+| Backup | SPI flash backup (512KB); restore colors, S/N, user calibration, factory reset of the user calibration, or a full restore. A backup that doesn't match the controller (another type, corrupt, another controller) is refused with a warning unless "Bypass the backup check" is checked; a partial one, always |
 | Serial | Change the S/N (the original is backed up inside the controller the first time), restore it |
 | Calibration | **Sticks**: guided stick calibration. **Motion**: guided 6-axis calibration, one position or two (turned 180°, cancels the surface's tilt). **Manual**: the original editor (user calibration values, stick device parameters). *Use factory* reverts each one |
 | Button test | Buttons, sticks (raw and calibrated) and 6-axis sensors live, with the calibration data |
@@ -65,8 +65,21 @@ priority) and `--expert`; the app has `--selftest`.
 
 ### Differences from the original
 
-- The color dialog's eyedropper (picking a color from anywhere on the screen) isn't
-  there: Kivy can only read its own window. Hex values, the color wheel and the presets are.
+- The color dialog's eyedropper works through each system's own means, as Kivy can only
+  read its own window: on Linux the desktop portal's color picker (KDE's or GNOME's, on
+  Wayland and X11), or on X11 without a portal the pixel under the pointer; on Windows the
+  pixel under the pointer; on macOS the system color panel and its magnifier. With the
+  pointer, the dialog follows it and Space or Enter takes the color (Esc cancels). "From
+  image" picks a pixel of any picture, Android included. In the CLI, `s` at a color prompt.
+- Writing colors also sets the factory configuration's format version (`0x601B`) the
+  Switch needs to show them: 2 on a Pro Controller, without which it keeps the grips the
+  body color (upstream issues #28, #104) or reverts the colors (#87).
+- The original refused another controller's backup only for a full restore, and checked
+  it only when it was loaded (#35: switching controllers before restoring wrote one
+  controller's backup onto another). Here any mismatch is refused unless you bypass the
+  check, and it's checked again on the controller connected when the restore starts.
+- The motion user calibration keeps the factory sensitivities (the original's Write Cal
+  wrote zeros, #107).
 - `-f` (don't check the connection again) isn't needed: the app doesn't poll the
   connection, it shows the link health instead.
 - Additions: guided stick and motion calibration, MIDI on the HD Rumble, link health,
@@ -138,8 +151,8 @@ so there's nothing to pair: choose a controller from the list.
 | Screen | What it does |
 |---|---|
 | Device info | Type, connection, MAC, S/N, battery, colors, which calibration is in use |
-| Colors | RGB editor for the body, buttons and (Pro Controller) grips, the retail and grip presets, your colors (`colors.xml`, the desktop app's format) |
-| Back up / Restore | A 512KB SPI backup in the desktop app's format (`spi_<type>_<MAC>.bin`, so backups move between the two), with the same checks; restore the colors, S/N, user calibration, or a full restore |
+| Colors | RGB editor for the body, buttons and (Pro Controller) grips, the desktop app's presets (every official color, the Pro Controller editions), your colors (`colors.xml`, the desktop app's format) |
+| Back up / Restore | A 512KB SPI backup in the desktop app's format (`spi_<type>_<MAC>.bin`, so backups move between the two), with the same checks (a mismatched backup only when you choose to bypass them); restore the colors, S/N, user calibration, or a full restore |
 | Calibration | The factory and user stick and motion calibration, and back to factory |
 | Serial number | Change it (the original is kept inside the controller) and restore it |
 | Button test | Buttons, sticks and motion sensors, as the Switch reports them |
@@ -224,6 +237,9 @@ Community changes merged into this version:
 * [arpruss (Alexander Pruss)](https://github.com/arpruss/jc_toolkit): IR camera Pointing (DPD) and Clustering modes, and the IR image border flicker fix.
 
 Other code and research this project builds on:
+
+* [switchbrew](https://switchbrew.org/wiki/Joy-Con): the official colors recovered from SPI dumps, and the factory configuration's layout.
+* The reporters in [CTCaer/jc_toolkit#28](https://github.com/CTCaer/jc_toolkit/issues/28) and [#104](https://github.com/CTCaer/jc_toolkit/issues/104) (Rabicrysta, Gpcas9, Ray160, jmickelonis, CLAPD and others): the Pro Controller editions' colors and the `0x601B` fix.
 
 * [dekuNukem and contributors](https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering): Joy-Con protocol reverse engineering.
 * [shinyquagsire23](https://github.com/shinyquagsire23/HID-Joy-Con-Whispering): hidapi usage on Linux.

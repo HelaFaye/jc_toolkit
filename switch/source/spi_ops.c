@@ -351,13 +351,16 @@ static const u8 VALIDATION[20] = {0x01, 0x08, 0x00, 0xF0, 0x00, 0x00, 0x62, 0x08
 static const u8 FW_MAGIC[6] = {0x0A, 0xFB, 0x00, 0x00, 0x02, 0x0D};
 static const u8 OTA_MAGIC[8] = {0xAA, 0x55, 0xF0, 0x0F, 0x68, 0xE5, 0x97, 0xD2};
 
-// The desktop app's Backup.check: NULL when it fits this controller
-static const char *check_backup(const Ctrl *c, const u8 *d, size_t size, bool *same_mac) {
-    *same_mac = false;
+// The desktop app's Backup.problems: the fatal problem (a partial file), or NULL and the
+// reasons it may not be this controller's backup (another type, corrupt, another
+// controller), written to problems. Those are refused unless the user bypasses the check.
+static const char *check_backup(const Ctrl *c, const u8 *d, size_t size, char *problems, size_t psize) {
+    problems[0] = 0;
     if (size != SPI_SIZE)
         return "Partial backup! The file size must be 512KB (524288 bytes).";
+    size_t n = 0;
     if (d[0x6012] != c->type || d[0x6013] != 0xA0)
-        return "Wrong backup! It's from another type of controller.";
+        n += snprintf(problems + n, psize - n, "Wrong backup! It's from another type of controller.\n");
     bool valid = !memcmp(d, VALIDATION, 20);
     bool ota = !memcmp(d + 0x1FF4 + 6, OTA_MAGIC, 8);
     for (int i = 0; i < 6; i++) {
@@ -366,12 +369,14 @@ static const char *check_backup(const Ctrl *c, const u8 *d, size_t size, bool *s
         if (d[0x10000 + i] != FW_MAGIC[i] || (ota && d[0x28000 + i] != FW_MAGIC[i]))
             valid = false;
     }
-    if (!valid)
-        return "Corrupt backup! Please try another backup.";
-    *same_mac = true;
+    if (!valid && n < psize)
+        n += snprintf(problems + n, psize - n, "Corrupt backup! It doesn't look like an SPI flash backup.\n");
+    bool same_mac = true;
     for (int i = 0; i < 6; i++)                // Stored reversed
         if (d[0x1A - i] != c->mac[i])
-            *same_mac = false;
+            same_mac = false;
+    if (!same_mac && n < psize)
+        snprintf(problems + n, psize - n, "Different BT MAC address! The backup is from another controller.\n");
     return NULL;
 }
 
@@ -412,17 +417,26 @@ void feat_restore(Ctrl *c) {
     size_t size = f ? fread(d, 1, SPI_SIZE + 1, f) : 0;
     if (f)
         fclose(f);
-    bool same_mac;
-    const char *err = check_backup(c, d, size, &same_mac);
+    char problems[300];
+    const char *err = check_backup(c, d, size, problems, sizeof(problems));
     ui_clear("Restore");
     if (err) {
         ui_message(CONSOLE_RED "%s" CONSOLE_RESET, err);
         free(d);
         return;
     }
+    bool bypass = problems[0] != 0;
+    if (bypass && !ui_confirm(CONSOLE_YELLOW "This backup doesn't match the controller:\n\n%s" CONSOLE_RESET
+                              "\nIt's refused unless you bypass the backup check.\n\n"
+                              "Bypass the backup check and restore it anyway?", problems)) {
+        ui_clear("Restore");
+        ui_message("Nothing was written.");
+        free(d);
+        return;
+    }
     char sub[400];
-    snprintf(sub, sizeof(sub), "Backup: %s\nIt's %s.\n", names[sel],
-             same_mac ? "from this controller" : CONSOLE_YELLOW "from another controller of this type" CONSOLE_RESET);
+    snprintf(sub, sizeof(sub), "Backup: %s\n%s\n", names[sel],
+             bypass ? CONSOLE_YELLOW "The backup check is bypassed." CONSOLE_RESET : "It's from this controller.");
     static const char *const OPTIONS[] = {
         "Colors", "Serial number", "User calibration (sticks and motion)",
         "Full restore: factory configuration and calibration, user calibration",
@@ -441,8 +455,9 @@ void feat_restore(Ctrl *c) {
     } else if (opt == 3 && ui_confirm("Write the factory configuration and calibration (0x6000, 4KB) and the user\n"
                                       "calibration (0x8000, 4KB) from the backup?%s\n\nDon't disconnect the controller "
                                       "while it writes.",
-                                      same_mac ? "" : CONSOLE_YELLOW "\n\nThe backup is from another controller: this "
-                                                      "gives this one its S/N and calibration." CONSOLE_RESET)) {
+                                      bypass ? CONSOLE_YELLOW "\n\nThe backup check is bypassed: this gives this "
+                                               "controller the backup's factory configuration (its type, S/N, calibration "
+                                               "and colors)." CONSOLE_RESET : "")) {
         rc = write_progress(c, 0x6000, d + 0x6000, 0x1000, "Factory configuration");
         if (R_SUCCEEDED(rc))
             rc = write_progress(c, 0x8000, d + 0x8000, 0x1000, "User calibration");

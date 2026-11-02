@@ -391,6 +391,10 @@ class BackupPanel(Panel):
         right.add_widget(Btn("Load SPI backup..", self.load))
         self.loaded = Lbl("No backup loaded.", color=DIM, size_hint_y=None, height=dp(60), valign="top")
         right.add_widget(self.loaded)
+        # Off: a backup that doesn't match the controller (another one, another type, corrupt)
+        # is refused; on: restored anyway, after a warning
+        self.chk_bypass = Check("Bypass the backup check (restore a backup from another controller)", False)
+        right.add_widget(self.chk_bypass)
         self.chk_l = Check("Left stick calibration", True)
         self.chk_r = Check("Right stick calibration", True)
         self.chk_s = Check("6-axis (acc/gyro) calibration", True)
@@ -408,7 +412,7 @@ class BackupPanel(Panel):
         right.add_widget(Widget())
         self.add_widget(right)
         self.backup_data = None
-        self.same_mac = False
+        self.backup_problems = []
         self.update_buttons()
 
     def on_device(self):
@@ -419,9 +423,8 @@ class BackupPanel(Panel):
 
     def update_buttons(self):
         have = self.backup_data is not None
-        for b in (self.btn_colors, self.btn_sn, self.btn_cal):
+        for b in (self.btn_colors, self.btn_sn, self.btn_cal, self.btn_full):
             b.disabled = not have
-        self.btn_full.disabled = not (have and self.same_mac)
 
     def on_spi_progress(self, offset):
         self.progress.value = offset
@@ -485,16 +488,16 @@ class BackupPanel(Panel):
                 if isinstance(mac, Exception):
                     return
                 b = ops.Backup(data)
-                err, same = b.check(self.jc.type, mac)
-                if err:
-                    self.backup_data, self.same_mac = None, False
-                    self.loaded.text = err
+                fatal, problems = b.problems(self.jc.type, mac)
+                if fatal:
+                    self.backup_data, self.backup_problems = None, []
+                    self.loaded.text = fatal
                     self.loaded.color = ERROR
                 else:
-                    self.backup_data, self.same_mac = b, same
-                    self.loaded.text = "Backup of %s loaded.%s" % (b.mac_text(), "" if same else
-                        "\nDifferent BT MAC address! The backup is from another %s: full restore is disabled." % TYPE_NAMES[self.jc.type])
-                    self.loaded.color = ACCENT if same else WARN
+                    self.backup_data, self.backup_problems = b, problems
+                    self.loaded.text = "Backup of %s loaded.%s" % (b.mac_text(), "".join("\n" + p for p in problems) + (
+                        "\nIt's refused unless you bypass the backup check." if problems else ""))
+                    self.loaded.color = ACCENT if not problems else WARN
                 self.update_buttons()
             self.run(lambda jc: ops.device_info(jc).mac_bytes, checked)
         storage.open_file("Load an SPI backup", chosen, filters=["*.bin"])
@@ -517,26 +520,30 @@ class BackupPanel(Panel):
                      "The controller reboots into pairing mode afterwards.", lambda jc: ops.full_restore(jc, b)),
         }
         text, restore_fn = texts[what]
+        bypass = self.chk_bypass.active
+        refused = "\n\nNothing was written. To restore it anyway, check \"Bypass the backup check\"."
+        if what != "reset" and self.backup_problems and not bypass:
+            message("Restore", "This backup doesn't match the controller:\n\n" + "\n".join(self.backup_problems) + refused)
+            return
+        if what != "reset" and self.backup_problems:
+            text = ("The backup check is bypassed:\n" + "\n".join(self.backup_problems) +
+                    ("\n\nA full restore gives this controller the other one's factory configuration: its type, "
+                     "S/N, calibration and colors." if what == "full" else "") + "\n\n" + text)
 
         def fn(jc):
-            # Checked again on the controller connected now: a backup loaded for another one
-            # mustn't be written to this one (upstream #35: a full restore of a Joy-Con (R)'s
-            # backup onto a Joy-Con (L) left it unusable)
+            # Checked again on the controller connected now (it may not be the one the backup
+            # was loaded for: upstream #35, a full restore of a Joy-Con (R)'s backup onto a
+            # Joy-Con (L) left it unusable)
             if what == "reset":                 # Erases the user calibration: no backup
                 return restore_fn(jc)
-            err, same = b.check(jc.type, ops.device_info(jc).mac_bytes)
-            if err:
-                return err
-            if what == "full" and not same:
-                return "The connected controller isn't the one this backup is from: full restore is disabled."
+            fatal, problems = b.problems(jc.type, ops.device_info(jc).mac_bytes)
+            if fatal or (problems and not bypass):
+                return fatal or "This backup doesn't match the controller connected now:\n\n" + "\n".join(problems) + refused
             return restore_fn(jc)
 
         def done(res):
             if isinstance(res, str):
-                message("Restore", res + "\n\nNothing was written. Load the backup again for this controller.")
-                self.backup_data = None
-                self.loaded.text, self.loaded.color = res, ERROR
-                self.update_buttons()
+                message("Restore", res)
                 return
             if res == 0:
                 message("Restore", "Done!" if what != "full" else

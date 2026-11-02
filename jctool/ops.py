@@ -137,16 +137,19 @@ class Backup:
     def __init__(self, data):
         self.data = bytes(data)
 
-    def check(self, device_type, device_mac):
-        """(error or None, same_mac). Errors: partial, wrong type, corrupt."""
+    def problems(self, device_type, device_mac):
+        """(fatal, problems): fatal is a partial file (nothing can be restored from it);
+        problems are why it may not be this controller's backup: another type of controller,
+        a corrupt backup, another controller. Those are refused unless the user bypasses the
+        check."""
         d = self.data
         if len(d) != 0x80000:
-            return "Partial backup! The file size must be 512KB (524288 Bytes)", False
+            return "Partial backup! The file size must be 512KB (524288 Bytes)", []
+        found = []
         if d[0x6012] != device_type or d[0x6013] != 0xA0:
             backup_type = TYPE_NAMES.get(d[0x6012], "unknown") if 1 <= d[0x6012] <= 3 else "unknown"
             name = TYPE_NAMES[device_type]
-            return 'Wrong backup! The file is a "%s" backup but your device is a "%s"!\nPlease try with a "%s" SPI backup.' % (
-                backup_type, name, name), False
+            found.append('Wrong backup! The file is a "%s" backup but your device is a "%s"!' % (backup_type, name))
         valid = d[0:20] == self.VALIDATION
         ota = d[0x1FF4 + 6:0x1FF4 + 14] == self.OTA_MAGIC
         for i in range(6):
@@ -155,9 +158,23 @@ class Backup:
             if d[0x10000 + i] != self.FW_MAGIC[i] or (ota and d[0x28000 + i] != self.FW_MAGIC[i]):
                 valid = False
         if not valid:
-            return "Corrupt backup! Please try another backup.", False
-        mac = bytes(d[0x1A - i] for i in range(6))     # Stored reversed
-        return None, mac == bytes(device_mac)
+            found.append("Corrupt backup! It doesn't look like an SPI flash backup.")
+        if self.mac() != bytes(device_mac):
+            found.append("Different BT MAC address! The backup is from another controller (%s)." % self.mac_text())
+        return None, found
+
+    def check(self, device_type, device_mac):
+        """(error or None, same_mac): the first problem that isn't the MAC address."""
+        fatal, found = self.problems(device_type, device_mac)
+        if fatal:
+            return fatal, False
+        others = [p for p in found if not p.startswith("Different BT MAC")]
+        if others:
+            return others[0], False
+        return None, len(found) == 0
+
+    def mac(self):
+        return bytes(self.data[0x1A - i] for i in range(6))     # Stored reversed
 
     def mac_text(self):
         return ":".join("%02x" % self.data[0x1A - i] for i in range(6))

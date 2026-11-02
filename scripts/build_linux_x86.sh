@@ -9,7 +9,13 @@
 # Output: dist/JoyConToolkit-<version>-linux-x86.tar.gz, self-tested under Xvfb.
 set -eu
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -qq
+# apt-get update only warns when the mirror can't be reached (a DNS hiccup on the runner):
+# retry until the package lists are really there
+for try in 1 2 3 4 5; do
+    apt-get update -qq && apt-cache show python3-venv >/dev/null 2>&1 && break
+    echo "apt-get update failed (try $try), retrying..."
+    sleep 15
+done
 # Compilers and headers for Kivy (SDL2, OpenGL) and python-rtmidi (ALSA); Xvfb and Mesa
 # for the self-test
 apt-get install -y -qq --no-install-recommends \
