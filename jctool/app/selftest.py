@@ -84,7 +84,9 @@ class SelfTest:
         angles = list(range(0, 3 * 360 + 1, 5))
 
         def rotate():
-            self.check(tab.wizard.step == tab.wizard.ROTATE, "stick wizard: center taken")
+            self.check(tab.wizard.step == tab.wizard.ROTATE, "stick wizard: center taken" +
+                       ("" if tab.wizard.step == tab.wizard.ROTATE else " (step %d, %d samples, problem %r, worker: %r)" % (
+                           tab.wizard.step, len(tab.wizard.recent), tab.wizard.problem, app.worker.busy_long)))
             def move(dt):
                 if not angles:
                     tab.finish()
@@ -306,7 +308,9 @@ class SelfTest:
                        bytes(self.fake.spi[0x6050:0x6053]) == b"\x0B\x0C\x0D",
                        "restore: another controller's backup refused, then restored with the check bypassed")
             self.next()
-        self.wait(lambda: bytes(self.fake.spi[0x6050:0x6053]) == b"\x0B\x0C\x0D", 5, done)
+        # Until the restore's own "Done!": the job (and its color format write) has ended, and
+        # no real dialog can open once the stand-ins are put back
+        self.wait(lambda: any(t.startswith("Done") for t in shown), 10, done)
 
     def debug_guard(self):
         """Expert mode: the SPI subcommands are refused without it."""
