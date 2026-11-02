@@ -105,7 +105,7 @@ without a GPU (the build script's check, the spec) uses `KIVY_GL_BACKEND=mock`.
 
 ## macOS
 
-Apple Silicon builds on `macos-latest`, Intel on `macos-15-intel`. Kivy's wheel is
+Apple Silicon builds on `macos-15`, Intel on `macos-15-intel`. Kivy's wheel is
 universal2; hidapi and python-rtmidi have one wheel per architecture, hence one build per
 architecture. `build.py` zips the app with `ditto`, which keeps the bundle's symlinks and
 attributes (a plain zip breaks it). The binaries aren't stripped: that would invalidate

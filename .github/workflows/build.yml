@@ -47,7 +47,7 @@ jobs:
           - os: windows-latest      # 32-bit Python: a 32-bit build (setup_venv.bat picks its packages)
             name: windows-x86
             arch: x86
-          - os: macos-latest        # Apple Silicon
+          - os: macos-15            # Apple Silicon (not macos-latest: its runners stopped being assigned in Nov 2026)
             name: macos
           - os: macos-15-intel      # Intel Macs
             name: macos-intel
