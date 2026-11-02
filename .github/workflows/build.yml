@@ -154,19 +154,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
-      - name: Network check (DNS in containers)
-        continue-on-error: true
-        run: |
-          cat /etc/resolv.conf; getent hosts deb.debian.org || echo "host: no"
-          for img in debian:bookworm i386/debian:bookworm; do
-            for dns in "" "--dns 1.1.1.1"; do
-              echo "== $img $dns"
-              docker run --rm $dns --platform $( [ $img = debian:bookworm ] && echo linux/amd64 || echo linux/386 ) $img \
-                sh -c 'cat /etc/resolv.conf | grep -v "^#"; getent hosts deb.debian.org || echo NO' || true
-            done
-          done
       - name: Build in a 32-bit Debian 12 container (Kivy and python-rtmidi from source)
-        run: docker run --rm --network host --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh
+        run: docker run --rm --security-opt seccomp=unconfined --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh
       - uses: actions/upload-artifact@v6
         with:
           name: JoyConToolkit-linux-x86
