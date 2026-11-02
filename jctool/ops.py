@@ -67,8 +67,33 @@ def read_colors(jc):
     return tuple(tuple(c[i:i + 3]) for i in range(0, 12, 3))
 
 
+# The factory configuration's format version (0x601B) says which colors the Switch reads:
+# 0 (or 0xFF) none, the default gray; 1 the body and buttons; 2 also the Pro Controller's
+# grips (system 5.0.0+). A Pro Controller still at 1 keeps its grips the body color whatever
+# is written (upstream issues #28, #57, #77, #104), and one at 3 is reported to revert its
+# colors on reconnect (#87).
+COLOR_FORMAT = 0x601B
+
+
+def wanted_color_format(device_type, current):
+    """The format to write for these colors, or None if the current one is right."""
+    if device_type == PROCON:
+        return None if current == 2 else 2
+    return None if current in (1, 2) else 1
+
+
+def ensure_color_format(jc):
+    """Sets the format version so that the Switch shows the written colors. 0 or 1."""
+    cur = jc.get_spi_data(COLOR_FORMAT, 1)
+    want = wanted_color_format(jc.type, cur[0] if cur else None)
+    if want is None:
+        return 0
+    return jc.write_spi_data(COLOR_FORMAT, bytes([want]))
+
+
 def write_colors(jc, body, buttons, left_grip=None, right_grip=None):
-    """Writes the colors (grips: Pro Controller). 0 or 1."""
+    """Writes the colors (grips: Pro Controller), and the format version the Switch needs to
+    show them. 0 or 1."""
     data = bytes(body) + bytes(buttons)
     if jc.type == PROCON:
         cur = jc.get_spi_data(0x6050, 12) or bytes(12)
@@ -76,6 +101,8 @@ def write_colors(jc, body, buttons, left_grip=None, right_grip=None):
         data += bytes(right_grip) if right_grip else cur[9:12]
     jc.set_led_busy()
     res = jc.write_spi_data(0x6050, data)
+    if res == 0:
+        res = ensure_color_format(jc)
     jc.send_rumble()
     return res
 
@@ -139,6 +166,8 @@ class Backup:
 def restore_colors(jc, backup):
     jc.set_led_busy()
     res = jc.write_spi_data(0x6050, backup.data[0x6050:0x6050 + 12])
+    if res == 0:
+        res = ensure_color_format(jc)
     jc.send_rumble()
     return res
 

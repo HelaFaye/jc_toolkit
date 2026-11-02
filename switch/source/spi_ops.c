@@ -1,5 +1,6 @@
 // The features that read and write the SPI flash (layout: jctool/ops.py, calibration.py)
 #include "common.h"
+#include "tables.h"
 
 static const u8 CAL_MAGIC[2] = {0xB2, 0xA1};
 
@@ -60,33 +61,24 @@ void feat_info(Ctrl *c) {
 }
 
 // ----------------------------------------------------------------------------------------
-// Colors: presets (jctool/presets.py), the user's own (colors.xml) and an RGB editor
-typedef struct {
-    const char *name;
-    u8 a[3], b[3];
-} Preset;
+// The factory configuration's format version (0x601B) says which colors the Switch reads:
+// 0 / 0xFF none (the default gray), 1 body and buttons, 2 also a Pro Controller's grips. At 1
+// a Pro Controller's grips stay the body color (upstream #28, #104); at 3 its colors are
+// reported to revert on reconnect (#87). Like jctool/ops.py's ensure_color_format.
+#define COLOR_FORMAT 0x601B
 
-static const Preset RETAIL[] = {
-    {"Grey", {0x82, 0x82, 0x82}, {0x0F, 0x0F, 0x0F}},
-    {"Neon Blue", {0x0A, 0xB9, 0xE6}, {0x00, 0x1E, 0x1E}},
-    {"Neon Red", {0xFF, 0x3C, 0x28}, {0x1E, 0x0A, 0x0A}},
-    {"Neon Yellow", {0xE6, 0xFF, 0x00}, {0x14, 0x28, 0x00}},
-    {"Neon Pink", {0xFF, 0x32, 0x78}, {0x28, 0x00, 0x1E}},
-    {"Neon Green", {0x1E, 0xDC, 0x00}, {0x00, 0x28, 0x00}},
-    {"Red", {0xE1, 0x0F, 0x00}, {0x28, 0x0A, 0x0A}},
-    {"Pro Black", {0x32, 0x32, 0x32}, {0xFF, 0xFF, 0xFF}},
-    {"Pastel Pink", {0xFF, 0xAF, 0xAF}, {0x37, 0x2D, 0x2D}},
-    {"Pastel Yellow", {0xF5, 0xFF, 0x82}, {0x32, 0x33, 0x2D}},
-    {"Pastel Purple", {0xF0, 0xCB, 0xEB}, {0x37, 0x30, 0x37}},
-    {"Pastel Green", {0xBC, 0xFF, 0xC8}, {0x2D, 0x32, 0x2D}},
-};
-static const Preset GRIPS[] = {
-    {"Normal Grips", {0x46, 0x46, 0x46}, {0x46, 0x46, 0x46}},
-    {"Xenoblade Grips", {0xDD, 0x3B, 0x64}, {0xDD, 0x3B, 0x64}},
-    {"Splatoon Grips", {0x1E, 0xDC, 0x00}, {0xFF, 0x32, 0x78}},
-};
-#define N_RETAIL (int)(sizeof(RETAIL) / sizeof(RETAIL[0]))
-#define N_GRIPS (int)(sizeof(GRIPS) / sizeof(GRIPS[0]))
+static Result ensure_color_format(const Ctrl *c) {
+    u8 cur = 0;
+    Result rc = spi_read(c, COLOR_FORMAT, &cur, 1);
+    if (R_FAILED(rc))
+        return rc;
+    u8 want = c->type == TYPE_PRO ? 2 : (cur == 1 || cur == 2 ? cur : 1);
+    return cur == want ? 0 : spi_write(c, COLOR_FORMAT, &want, 1);
+}
+
+// ----------------------------------------------------------------------------------------
+// Colors: presets (jctool/presets.py), the user's own (colors.xml) and an RGB editor
+// RETAIL, EDITIONS, GRIPS, PRO: tables.h, generated from jctool/presets.py
 
 #define MAX_USER 16
 #define COLORS_XML JC_DIR "/colors.xml"
@@ -171,37 +163,50 @@ static void save_user_color(const u8 rgb[3]) {
 }
 
 // Preset picker for one slot pair: body+buttons (retail and the user's), or the grips
+// The presets for the color being edited: body / buttons (retail, editions, the user's
+// own), or grips; and on a Pro Controller its editions (all four colors)
 static bool pick_preset(Ctrl *c, bool grips, u8 colors[12], int slot) {
-    const char *items[N_RETAIL + MAX_USER + 1];
-    char labels[MAX_USER][80];
+    enum { MAX_ITEMS = N_RETAIL + N_EDITIONS + N_GRIPS + N_PRO + MAX_USER };
+    const char *items[MAX_ITEMS];
+    const Preset *chosen[MAX_ITEMS];
+    int kind[MAX_ITEMS];                 // 0: body+buttons, 1: grips, 2: all four, 3: user's
+    static char labels[MAX_ITEMS][96];
     UserColor user[MAX_USER];
-    int n = 0, n_user = 0;
-    if (grips) {
-        for (int i = 0; i < N_GRIPS; i++)
-            items[n++] = GRIPS[i].name;
-    } else {
-        for (int i = 0; i < N_RETAIL; i++)
-            items[n++] = RETAIL[i].name;
-        n_user = load_user_colors(user);
-        for (int i = 0; i < n_user; i++) {
-            snprintf(labels[i], sizeof(labels[i]), "%.40s (#%02X%02X%02X, yours: sets the %s)", user[i].name, user[i].rgb[0],
-                     user[i].rgb[1], user[i].rgb[2], slot == 1 ? "buttons" : "body");
-            items[n++] = labels[i];
-        }
+    int n = 0;
+#define ADD(list, count, k, prefix)                                                       \
+    for (int i = 0; i < (count); i++, n++) {                                              \
+        snprintf(labels[n], sizeof(labels[n]), "%s%s", prefix, list[i].name);            \
+        items[n] = labels[n];                                                            \
+        chosen[n] = &list[i];                                                            \
+        kind[n] = k;                                                                     \
     }
-    int sel = ui_menu(grips ? "Grip colors" : "Retail colors", NULL, items, n, 0);
+    if (grips) {
+        ADD(GRIPS, N_GRIPS, 1, "");
+    } else {
+        ADD(RETAIL, N_RETAIL, 0, "");
+        ADD(EDITIONS, N_EDITIONS, 0, "");
+    }
+    if (c->type == TYPE_PRO)
+        ADD(PRO, N_PRO, 2, "Pro: ");
+#undef ADD
+    int n_user = grips ? 0 : load_user_colors(user);
+    for (int i = 0; i < n_user; i++, n++) {
+        snprintf(labels[n], sizeof(labels[n]), "%.40s (#%02X%02X%02X, yours: sets the %s)", user[i].name,
+                 user[i].rgb[0], user[i].rgb[1], user[i].rgb[2], slot == 1 ? "buttons" : "body");
+        items[n] = labels[n];
+        chosen[n] = NULL;
+        kind[n] = 3;
+    }
+    int sel = ui_menu(grips ? "Grip colors" : "Color presets", NULL, items, n, 0);
     if (sel < 0)
         return false;
-    if (grips) {
-        memcpy(colors + 6, GRIPS[sel].a, 3);
-        memcpy(colors + 9, GRIPS[sel].b, 3);
-    } else if (sel < N_RETAIL) {
-        memcpy(colors, RETAIL[sel].a, 3);
-        memcpy(colors + 3, RETAIL[sel].b, 3);
-    } else {
-        memcpy(colors + (slot == 1 ? 3 : 0), user[sel - N_RETAIL].rgb, 3);
+    const Preset *p = chosen[sel];
+    switch (kind[sel]) {
+        case 0: memcpy(colors, p->c[0], 3); memcpy(colors + 3, p->c[1], 3); break;
+        case 1: memcpy(colors + 6, p->c[0], 3); memcpy(colors + 9, p->c[1], 3); break;
+        case 2: for (int i = 0; i < 4; i++) memcpy(colors + i * 3, p->c[i], 3); break;
+        default: memcpy(colors + (slot == 1 ? 3 : 0), user[sel - (n - n_user)].rgb, 3);
     }
-    (void)c;
     return true;
 }
 
@@ -275,7 +280,10 @@ void feat_colors(Ctrl *c) {
                 continue;
             printf("\nWriting...\n");
             consoleUpdate(NULL);
-            if (failed(spi_write(c, 0x6050, colors, slots * 3), "Writing the colors"))
+            Result wrc = spi_write(c, 0x6050, colors, slots * 3);
+            if (R_SUCCEEDED(wrc))
+                wrc = ensure_color_format(c);
+            if (failed(wrc, "Writing the colors"))
                 continue;
             memcpy(orig, colors, 12);
             ui_message(CONSOLE_GREEN "Done." CONSOLE_RESET " Reconnect the controller to see them in the Switch's menus.");
@@ -424,6 +432,8 @@ void feat_restore(Ctrl *c) {
     ui_clear("Restore");
     if (opt == 0 && ui_confirm("Restore the colors?")) {
         rc = spi_write(c, 0x6050, d + 0x6050, 12);
+        if (R_SUCCEEDED(rc))
+            rc = ensure_color_format(c);
     } else if (opt == 1 && ui_confirm("Restore the serial number (%.16s)?", d + 0x6000)) {
         rc = spi_write(c, 0x6000, d + 0x6000, 0x10);
     } else if (opt == 2 && ui_confirm("Restore the user calibration of the sticks and motion sensors?")) {

@@ -206,16 +206,35 @@ class DevicePanel(Panel):
         grips = key in ("lgrip", "rgrip")
         user_path = storage.data_path("colors.xml")
 
-        def use_pair(a, b):
-            k1, k2 = ("lgrip", "rgrip") if grips else ("body", "buttons")
-            self.fields[k1].text, self.fields[k2].text = ops.hex_color(a), ops.hex_color(b)
+        def use(name, values, keys):
+            for k, v in zip(keys, values):
+                self.fields[k].text = ops.hex_color(v)
             popup.dismiss()
             self.update_preview()
-        retail = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(4))
-        retail.add_widget(Lbl("Grips:" if grips else "Retail:", color=DIM, size_hint_x=None, width=dp(60)))
-        for name, a, b in (presets.GRIPS if grips else presets.RETAIL):
-            retail.add_widget(Swatch(a, b, name, lambda a=a, b=b: use_pair(a, b)))
-        box.add_widget(retail)
+            self.app.set_status("Preset: %s (not written yet)" % name)
+
+        def preset_row(label, items, keys):
+            """A row of preset swatches that scrolls sideways: (name, color, ...) items."""
+            row = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(4))
+            row.add_widget(Lbl(label, color=DIM, size_hint_x=None, width=dp(70)))
+            strip = BoxLayout(size_hint_x=None, width=len(items) * dp(42), spacing=dp(4))
+            for item in items:
+                name, values = item[0], item[1:]
+                # Two colors per swatch: body over buttons, or left / right grip
+                shown = values if len(values) == 2 else (values[0], values[2])
+                strip.add_widget(Swatch(shown[0], shown[1], name, lambda n=name, v=values: use(n, v, keys),
+                                        size_hint_x=None, width=dp(38)))
+            scroll = ScrollView(do_scroll_y=False, bar_width=dp(4))
+            scroll.add_widget(strip)
+            row.add_widget(scroll)
+            box.add_widget(row)
+        if grips:
+            preset_row("Grips:", presets.GRIPS, ("lgrip", "rgrip"))
+        else:
+            preset_row("Retail:", presets.RETAIL, ("body", "buttons"))
+            preset_row("Editions:", presets.EDITIONS, ("body", "buttons"))
+        if self.jc is not None and self.jc.type == PROCON:
+            preset_row("Pro:", presets.PRO, ("body", "buttons", "lgrip", "rgrip"))
 
         user_row = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(4))
         chosen = {"name": None}
@@ -442,9 +461,28 @@ class BackupPanel(Panel):
             "full": ("This will do a full restore of the Factory configuration and User calibration!\n\n"
                      "The controller reboots into pairing mode afterwards.", lambda jc: ops.full_restore(jc, b)),
         }
-        text, fn = texts[what]
+        text, restore_fn = texts[what]
+
+        def fn(jc):
+            # Checked again on the controller connected now: a backup loaded for another one
+            # mustn't be written to this one (upstream #35: a full restore of a Joy-Con (R)'s
+            # backup onto a Joy-Con (L) left it unusable)
+            if what == "reset":                 # Erases the user calibration: no backup
+                return restore_fn(jc)
+            err, same = b.check(jc.type, ops.device_info(jc).mac_bytes)
+            if err:
+                return err
+            if what == "full" and not same:
+                return "The connected controller isn't the one this backup is from: full restore is disabled."
+            return restore_fn(jc)
 
         def done(res):
+            if isinstance(res, str):
+                message("Restore", res + "\n\nNothing was written. Load the backup again for this controller.")
+                self.backup_data = None
+                self.loaded.text, self.loaded.color = res, ERROR
+                self.update_buttons()
+                return
             if res == 0:
                 message("Restore", "Done!" if what != "full" else
                         "The full restore was completed!\n\nThe controller was rebooted and it is now in pairing mode. "

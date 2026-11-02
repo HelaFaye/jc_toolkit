@@ -230,13 +230,7 @@ def write_user_calibration(jc, left=None, right=None, sensor=None):
         stick[0:11] = MAGIC + encode_stick(left, True)
     if right is not None and jc.type != JOYCON_L:
         stick[11:22] = MAGIC + encode_stick(right, False)
-    sens = bytearray(b"\xFF" * 26)
-    if sensor is not None:
-        sens = bytearray(26)
-        sens[0:2] = MAGIC
-        for i in range(3):
-            sens[2 + i * 2:4 + i * 2] = (sensor[i] & 0xFFFF).to_bytes(2, "little")
-            sens[14 + i * 2:16 + i * 2] = (sensor[3 + i] & 0xFFFF).to_bytes(2, "little")
+    sens = b"\xFF" * 26 if sensor is None else motion_cal(jc, sensor)
     res = jc.write_spi_data(0x8010, stick)
     if res == 0:
         res = jc.write_spi_data(0x8026, sens)
@@ -261,18 +255,33 @@ def factory_stick(jc, left):
     return jc.write_spi_data(0x8010 if left else 0x801B, b"\xFF" * 11)
 
 
-def save_motion(jc, origins):
-    """Writes the 6-axis user calibration: measured origins (acc XYZ, gyro XYZ) with the
-    factory sensitivities. 0 or 1."""
-    factory = jc.get_spi_data(0x6020, 24) or bytes(24)
+# The sensitivities HOS writes in a user calibration (upstream #107), for when the factory
+# ones can't be read or are blank
+DEFAULT_ACC_SENSITIVITY = 0x4000
+DEFAULT_GYRO_SENSITIVITY = 0x343B
+
+
+def motion_cal(jc, origins):
+    """The 26 bytes of a 6-axis user calibration: measured origins (acc XYZ, gyro XYZ) with
+    the factory sensitivities. A user calibration with zero sensitivities (what the
+    original's Write Cal stored, upstream #107) breaks the motion controls."""
+    factory = jc.get_spi_data(0x6020, 24) or b"\xFF" * 24
     cal = bytearray(26)
     cal[0:2] = MAGIC
     for i in range(3):
         cal[2 + i * 2:4 + i * 2] = (origins[i] & 0xFFFF).to_bytes(2, "little")
         cal[14 + i * 2:16 + i * 2] = (origins[3 + i] & 0xFFFF).to_bytes(2, "little")
-    cal[8:14] = factory[6:12]                 # Acc sensitivity
-    cal[20:26] = factory[18:24]               # Gyro sensitivity
-    return jc.write_spi_data(0x8026, cal)
+        for dst, src, default in ((8, 6, DEFAULT_ACC_SENSITIVITY), (20, 18, DEFAULT_GYRO_SENSITIVITY)):
+            v = u16le(factory, src + i * 2)
+            if v in (0, 0xFFFF):
+                v = default
+            cal[dst + i * 2:dst + i * 2 + 2] = v.to_bytes(2, "little")
+    return bytes(cal)
+
+
+def save_motion(jc, origins):
+    """Writes the 6-axis user calibration (motion_cal). 0 or 1."""
+    return jc.write_spi_data(0x8026, motion_cal(jc, origins))
 
 
 def factory_motion(jc):

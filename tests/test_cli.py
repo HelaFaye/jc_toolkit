@@ -35,15 +35,23 @@ def test_device_info_and_calibration(capsys, monkeypatch, tmp_path):
 
 
 def test_colors_written_after_confirmation(capsys, monkeypatch, tmp_path):
-    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "12345", "zz3456", "123456", "abcdef", "y"])
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "", "12345", "zz3456", "123456", "abcdef", "y"])
     assert out.count("Enter a color as RRGGBB") == 2
     assert "[+] The colors were written to the device!" in out
     assert bytes(fake.spi[0x6050:0x6056]).hex() == "123456abcdef"
 
 
 def test_colors_unchanged_when_not_confirmed(capsys, monkeypatch, tmp_path):
-    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "123456", "", "n"])
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "", "123456", "", "n"])
     assert bytes(fake.spi[0x6050:0x6053]).hex() == "ff3c28"
+
+
+def test_color_preset(capsys, monkeypatch, tmp_path):
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "3", "", "", "y"])     # 3: Neon Blue, then keep both
+    assert " 3. Neon Blue" in out and "Tears of the Kingdom" in out and "Splatoon 3 Edition" not in out
+    assert bytes(fake.spi[0x6050:0x6056]).hex() == "0ab9e6001e1e"
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "", "y"], args=("--demo", "pro"))
+    assert "Splatoon 3 Edition" in out and "Smash Grips" in out
 
 
 def test_backup_then_restore_colors(capsys, monkeypatch, tmp_path):

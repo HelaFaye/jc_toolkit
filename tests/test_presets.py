@@ -23,9 +23,17 @@ def test_reads_the_original_colors_xml(tmp_path):
     assert presets.load_user(str(path)) == [("Blue", (0x0A, 0xB9, 0xE6))]
 
 
-def test_retail_presets_match_the_original():
-    assert dict((n, (a, b)) for n, a, b in presets.RETAIL)["Neon Red"] == ((0xFF, 0x3C, 0x28), (0x1E, 0x0A, 0x0A))
-    assert len(presets.RETAIL) == 12 and len(presets.GRIPS) == 3
+def test_presets():
+    retail = dict((n, (a, b)) for n, a, b in presets.RETAIL)
+    assert retail["Neon Red"] == ((0xFF, 0x3C, 0x28), (0x1E, 0x0A, 0x0A))
+    # The original's 12 are all there, and the rest of switchbrew's retail colors
+    assert {"Grey", "Pastel Green", "Pro Black", "Neon Purple", "Neon Orange", "Blue", "White"} <= set(retail)
+    names = [p[0] for group in (presets.RETAIL, presets.EDITIONS, presets.GRIPS, presets.PRO) for p in group]
+    assert len(names) == len(set(names))
+    pro = dict((p[0], p[1:]) for p in presets.PRO)
+    assert pro["Splatoon 3 Edition"] == ((0x2D, 0x2D, 0x2D), (0xE6, 0xE6, 0xE6), (0x64, 0x55, 0xF5), (0xC3, 0xFA, 0x05))
+    edition_pairs = {(a, b) for _, a, b in presets.EDITIONS}
+    assert not edition_pairs & set(retail.values())     # No edition repeats a retail color
 
 
 def test_battery_images():

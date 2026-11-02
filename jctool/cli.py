@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 
-from . import __version__, calibration, ops
+from . import __version__, calibration, ops, presets
 from .core import JoyCon, Ui
 from .hidio import (JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, Device, enumerate_controllers,
                     list_hid_devices)
@@ -523,8 +523,23 @@ class Cli:
         if c is None:
             return
         c = list(c)
-        print("\nEnter new colors as RRGGBB (Enter keeps a color).")
         changed = False
+        # The presets: (name, the slots they set, their colors)
+        choices = [(n, (0, 1), (a, b)) for n, a, b in presets.RETAIL + presets.EDITIONS]
+        if jc.type == PROCON:
+            choices += [(n, (2, 3), (a, b)) for n, a, b in presets.GRIPS]
+            choices += [(p[0], (0, 1, 2, 3), p[1:]) for p in presets.PRO]
+        print("\nPresets (body/buttons%s):" % (", grips, Pro Controller editions" if jc.type == PROCON else ""))
+        for i, (name, _, values) in enumerate(choices, 1):
+            print("  %2d. %-24s %s" % (i, name, " ".join(ops.hex_color(v) for v in values)))
+        pick = self.ask_int("Preset (0: enter colors yourself)", 0, 0, len(choices))
+        if pick:
+            name, slots, values = choices[pick - 1]
+            for slot, v in zip(slots, values):
+                c[slot] = v
+            changed = True
+            print("%s:" % name)
+        print("\nEnter new colors as RRGGBB (Enter keeps a color).")
         names = ["Body color", "Buttons color"] + (["Left grip color", "Right grip color"] if jc.type == PROCON else [])
         for i, name in enumerate(names):
             ch, c[i] = self.ask_color(name, c[i])

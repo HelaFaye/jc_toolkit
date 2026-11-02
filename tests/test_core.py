@@ -42,6 +42,25 @@ def test_colors_written(right, pro):
     assert bytes(fake.spi[0x6056:0x605C]).hex() == "010203040506"
 
 
+def test_color_format(right, pro):
+    """0x601B: the Switch shows Pro Controller grips only at format 2 (upstream #28, #104)."""
+    fake, jc, ui = pro
+    assert fake.spi[0x601B] == 1
+    assert ops.write_colors(jc, (0x2D, 0x2D, 0x2D), (0xE6, 0xE6, 0xE6), (0x64, 0x55, 0xF5), (0xC3, 0xFA, 0x05)) == 0
+    assert fake.spi[0x601B] == 2
+    fake.spi[0x601B] = 3                    # Reverted its colors on reconnect (#87)
+    assert ops.write_colors(jc, (1, 2, 3), (4, 5, 6)) == 0
+    assert fake.spi[0x601B] == 2
+    fake, jc, ui = right
+    assert ops.write_colors(jc, (0x12, 0x34, 0x56), (0xAB, 0xCD, 0xEF)) == 0
+    assert fake.spi[0x601B] == 1            # Joy-Con: unchanged
+    fake.spi[0x601B] = 0                    # No colors: the Switch would show the default gray
+    assert ops.restore_colors(jc, ops.Backup(bytes(fake.spi))) == 0
+    assert fake.spi[0x601B] == 1
+    assert [ops.wanted_color_format(t, c) for t, c in ((JOYCON_L, 0xFF), (JOYCON_R, 2), (PROCON, 1), (PROCON, 2))] == \
+        [1, None, 2, None]
+
+
 def test_spi_dump_is_the_flash(tmp_path, right):
     fake, jc, ui = right
     path = tmp_path / ops.backup_filename(jc)
@@ -103,6 +122,20 @@ def test_user_calibration_write_and_read_back(right):
     assert calibration.read_status(jc)[0] == "User (stick)"
     assert calibration.write_stick_params(jc, (150, 3000)) == 0
     assert bytes(fake.spi[0x6089:0x608C]).hex() == "9680bb"
+
+
+def test_user_motion_calibration_keeps_the_sensitivities(right):
+    """Write Cal stored zeros as the sensitivities in the original (upstream #107)."""
+    fake, jc, ui = right
+    origins = [10, -20, 300, 4, -5, 6]
+    assert calibration.write_user_calibration(jc, sensor=origins) == 0
+    cal = bytes(fake.spi[0x8026:0x8040])
+    assert cal[0:2] == calibration.MAGIC
+    assert cal[8:14] == bytes(fake.spi[0x6026:0x602C]) and cal[20:26] == bytes(fake.spi[0x6032:0x6038])
+    assert calibration.read_all(jc).sensor_values(True)[:3] == [10, -20, 300]
+    fake.spi[0x6020:0x6038] = b"\xFF" * 24         # No factory calibration: HOS's values
+    assert calibration.write_user_calibration(jc, sensor=origins) == 0
+    assert bytes(fake.spi[0x802E:0x8034]).hex() == "004000400040" and bytes(fake.spi[0x803A:0x8040]).hex() == "3b343b343b34"
 
 
 def test_button_test_reports(right):
