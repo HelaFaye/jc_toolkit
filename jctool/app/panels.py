@@ -13,9 +13,9 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
 
-from .. import ops, presets
-from ..hidio import JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, list_hid_devices
-from . import storage
+from .. import ops, presets, screen_color
+from ..hidio import JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, is_android, list_hid_devices
+from . import eyedropper, storage
 from .widgets import (ACCENT, BACK, BUTTON, DARK, DIM, ERROR, GRID, TEXT, WARN, Btn, Check, Choice, Field,
                       Filled, Lbl, Mono, Section, confirm, message, rgba)
 
@@ -252,6 +252,60 @@ class DevicePanel(Panel):
         fill_user(presets.load_user(user_path))
         box.add_widget(user_row)
 
+        # Eyedroppers: the screen (desktop) and an image (anywhere)
+        pick_row = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(6))
+        pick_status = Lbl("", color=DIM, font_size=dp(12))
+        sampler = {"on": None}
+
+        def set_picker(rgb):
+            if rgb:
+                picker.color = rgba(*rgb)
+
+        def from_screen():
+            if sampler["on"]:
+                return
+            rgb_now = tuple(int(round(v * 255)) for v in picker.color[:3])
+            if screen_color.has_system_picker():
+                pick_status.text = "Pick a color with the system's color picker..."
+
+                def done(rgb):
+                    set_picker(rgb)
+                    pick_status.text = "" if rgb else "No color picked."
+                eyedropper.system_pick(rgb_now, done)
+            elif screen_color.has_pointer_picker():
+                pick_status.text = ("Point at any color on the screen (don't click), then press Space or Enter. "
+                                    "Esc cancels.")
+
+                def follow(rgb, pos):
+                    set_picker(rgb)
+
+                def done(rgb):
+                    sampler["on"] = None
+                    set_picker(rgb or rgb_now)
+                    pick_status.text = "Picked %s." % ops.hex_color(rgb) if rgb else ""
+                sampler["on"] = eyedropper.PointerSampler(follow, done)
+            else:
+                pick_status.text = "This system has no screen color picker (Wayland without a desktop portal?)."
+
+        def from_image():
+            def chosen_file(path):
+                def done(rgb, error):
+                    if error:
+                        message("Colors", error)
+                    set_picker(rgb)
+                eyedropper.pick_from_image(path, done)
+            storage.open_file("An image to pick a color from", chosen_file,
+                              filters=["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tga"])
+        if not is_android():
+            pick_row.add_widget(Btn("From screen", from_screen, color=TEXT, size_hint_x=None, width=dp(120)))
+        pick_row.add_widget(Btn("From image", from_image, color=TEXT, size_hint_x=None, width=dp(120)))
+        pick_row.add_widget(pick_status)
+        box.add_widget(pick_row)
+
+        def stop_sampler(*_):
+            if sampler["on"]:
+                sampler["on"].stop(None)
+
         name = Field("", hint_text="Name for your color")
         row = BoxLayout(size_hint_y=None, height=dp(34), spacing=dp(6))
         row.add_widget(name)
@@ -276,6 +330,7 @@ class DevicePanel(Panel):
                                 ("Cancel", popup.dismiss, TEXT)):
             row.add_widget(Btn(text, fn, color=color, size_hint_x=None, width=dp(110)))
         box.add_widget(row)
+        popup.bind(on_dismiss=stop_sampler)
         popup.open()
         return popup
 

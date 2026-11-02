@@ -26,7 +26,7 @@ class SelfTest:
 
     # A step: fn() returns None when done, or a (condition, seconds) to wait for first
     def start(self):
-        self.steps = [self.connected, self.colors, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
+        self.steps = [self.connected, self.colors, self.eyedropper, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
                       self.backup, self.midi_file, self.tune, self.finish]
         Clock.schedule_once(lambda dt: self.next(), 1.0)
 
@@ -225,6 +225,54 @@ class SelfTest:
             self.check(bytes(self.fake.spi[0x6050:0x6056]).hex() == "0ab9e6001e1e", "colors written to the controller")
             self.next()
         self.wait(lambda: bytes(self.fake.spi[0x6050:0x6053]).hex() == "0ab9e6", 5, done)
+
+    def eyedropper(self):
+        """The color dialog's eyedroppers: a pixel from an image (left half red, right half
+        blue, tapped through the popup), and the pointer sampler (the pixel under the pointer
+        as it moves, Space takes it, Esc keeps the color it had)."""
+        from kivy.core.window import Window
+        from .. import png, screen_color
+        from . import eyedropper
+        path = storage.data_path("eyedropper_test.png")
+        w, h = 8, 4
+        rgb = b"".join((b"\xE1\x0F\x00" if x < w // 2 else b"\x0A\xB9\xE6") for y in range(h) for x in range(w))
+        png.write_png_rgb(path, rgb, w, h)
+        got = []
+        popup = eyedropper.pick_from_image(path, lambda c, err: got.append(c))
+        image = [c for c in popup.content.walk() if c.__class__.__name__ == "Image"][0]
+
+        def tap():
+            nw, nh = image.norm_image_size
+            core = image.texture
+            left = eyedropper.pixel_at(image, eyedropper.CoreImage.load(path, keep_data=True),
+                                       image.center_x - nw / 4, image.center_y)
+            right = eyedropper.pixel_at(image, eyedropper.CoreImage.load(path, keep_data=True),
+                                        image.center_x + nw / 4, image.center_y + nh / 4)
+            outside = eyedropper.pixel_at(image, eyedropper.CoreImage.load(path, keep_data=True),
+                                          image.center_x, image.center_y + nh)
+            use = [c for c in popup.content.walk() if getattr(c, "text", "") == "Use"][0]
+            image.dispatch("on_touch_down", type("T", (), {"pos": (image.center_x + nw / 4, image.center_y)})())
+            use.dispatch("on_press")
+            self.check(core is not None and left == (0xE1, 0x0F, 0x00) and right == (0x0A, 0xB9, 0xE6) and outside is None
+                       and got == [(0x0A, 0xB9, 0xE6)], "eyedropper: a pixel from an image (%s %s %s)" % (left, right, got))
+
+            # The pointer sampler, with the screen reading replaced (Xlib itself: test_screen_color.py)
+            real = screen_color.under_pointer
+            screen_color.under_pointer = lambda: ((5, 6), (0x12, 0x34, 0x56))
+            seen, results = [], []
+            s1 = eyedropper.PointerSampler(lambda c, pos: seen.append((c, pos)), results.append)
+
+            def take():
+                s1.sample()
+                Window.dispatch("on_keyboard", eyedropper.KEY_SPACE, 0, " ", [])
+                s2 = eyedropper.PointerSampler(lambda c, pos: None, results.append)
+                Window.dispatch("on_keyboard", eyedropper.KEY_ESC, 0, None, [])
+                screen_color.under_pointer = real
+                self.check(seen and seen[-1] == ((0x12, 0x34, 0x56), (5, 6)) and results == [(0x12, 0x34, 0x56), None]
+                           and s2.event is not None, "eyedropper: the pixel under the pointer, Space / Esc")
+                self.next()
+            Clock.schedule_once(lambda dt: take(), 0.3)
+        Clock.schedule_once(lambda dt: tap(), 0.5)
 
     def debug_guard(self):
         """Expert mode: the SPI subcommands are refused without it."""

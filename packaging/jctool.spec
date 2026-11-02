@@ -31,7 +31,7 @@ deps = get_deps_minimal(window=["sdl2", "x11"] if LINUX else "sdl2", text="sdl2"
                         video=None, audio=None, spelling=None, camera=None)
 hidden = deps["hiddenimports"] + ["hid", "mido.backends.rtmidi", "rtmidi"]
 if sys.platform.startswith("linux"):
-    hidden.append("hidraw")
+    hidden += ["hidraw", "jeepney", "jeepney.io.blocking"]
 
 a = Analysis(
     [os.path.join(ROOT, "main.py")],
@@ -67,7 +67,7 @@ exe = EXE(
 c = Analysis(
     [os.path.join(SPECPATH, "jctool_cli.py")],
     pathex=[ROOT],
-    hiddenimports=["hid", "mido.backends.rtmidi", "rtmidi"] + (["hidraw"] if sys.platform.startswith("linux") else []),
+    hiddenimports=["hid", "mido.backends.rtmidi", "rtmidi"] + (["hidraw", "jeepney", "jeepney.io.blocking"] if LINUX else []),
     excludes=["kivy", "pytest", "jnius", "android"],
 )
 exe_cli = EXE(

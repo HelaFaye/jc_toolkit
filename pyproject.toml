@@ -12,6 +12,8 @@ requires-python = ">=3.8"
 dependencies = [
     "kivy>=2.2",
     "hidapi>=0.14",
+    # The desktop portal's color picker (D-Bus), for the screen eyedropper
+    "jeepney>=0.8; sys_platform == 'linux'",
 ]
 
 [project.optional-dependencies]

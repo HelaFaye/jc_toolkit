@@ -54,6 +54,14 @@ def test_color_preset(capsys, monkeypatch, tmp_path):
     assert "Splatoon 3 Edition" in out and "Smash Grips" in out
 
 
+def test_color_from_screen(capsys, monkeypatch, tmp_path):
+    from jctool import screen_color
+    monkeypatch.setattr(screen_color, "has_system_picker", lambda: True)
+    monkeypatch.setattr(screen_color, "system_pick", lambda start: (0xD2, 0xBE, 0x69))
+    out, fake = run(capsys, monkeypatch, tmp_path, ["7", "", "s", "", "y"])
+    assert "Picked #D2BE69." in out and bytes(fake.spi[0x6050:0x6053]).hex() == "d2be69"
+
+
 def test_backup_then_restore_colors(capsys, monkeypatch, tmp_path):
     out, fake = run(capsys, monkeypatch, tmp_path, ["8"])
     path = tmp_path / "spi_right_98B6E9123456.bin"

@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 
-from . import __version__, calibration, ops, presets
+from . import __version__, calibration, ops, presets, screen_color
 from .core import JoyCon, Ui
 from .hidio import (JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, Device, enumerate_controllers,
                     list_hid_devices)
@@ -166,15 +166,42 @@ class Cli:
             print("  Enter a number from %d to %d." % (lo, hi))
 
     def ask_color(self, question, rgb):
-        """(changed, rgb) for an RRGGBB answer; empty input keeps the color."""
+        """(changed, rgb) for an RRGGBB answer, or s: a color from the screen; empty input
+        keeps the color."""
         while True:
-            answer = self.read_line("%s [%s]: " % (question, ops.hex_color(rgb)[1:])).strip()
+            answer = self.read_line("%s [%s, s: from the screen]: " % (question, ops.hex_color(rgb)[1:])).strip()
             if not answer:
                 return False, rgb
+            if answer.lower() == "s":
+                picked = self.color_from_screen(rgb)
+                if picked:
+                    print("  Picked %s." % ops.hex_color(picked))
+                    return True, picked
+                continue
             try:
                 return True, ops.parse_color(answer)
             except ValueError:
                 print("  Enter a color as RRGGBB (hex), e.g. FF3C28.")
+
+    def color_from_screen(self, rgb):
+        """The system's color picker, or the pixel under the pointer after a countdown (a
+        terminal can't follow the pointer). None if there's neither, or nothing was picked."""
+        if screen_color.has_system_picker():
+            print("  Pick a color with the system's color picker...")
+            picked = screen_color.system_pick(rgb)
+            if picked is None:
+                print("  No color picked.")
+            return picked
+        if screen_color.has_pointer_picker():
+            for n in (3, 2, 1):
+                print("\r  Point at the color on the screen: %d " % n, end="", flush=True)
+                time.sleep(1)
+            found = screen_color.under_pointer()
+            print()
+            if found:
+                return found[1]
+        print("  This system has no screen color picker.")
+        return None
 
     # --- Connection
     def found(self):
