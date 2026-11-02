@@ -3,7 +3,7 @@
 # compiled here, against Debian 12's SDL2 and ALSA. It runs inside a 32-bit Debian 12
 # container (glibc 2.36: the build runs on that and newer), from the repo root:
 #
-#   docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm \
+#   docker run --rm --network host --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm \
 #       sh scripts/build_linux_x86.sh
 #
 # Output: dist/JoyConToolkit-<version>-linux-x86.tar.gz, self-tested under Xvfb.
@@ -16,6 +16,10 @@ for try in 1 2 3 4 5; do
     echo "apt-get update failed (try $try), retrying..."
     sleep 15
 done
+apt-cache show python3-venv >/dev/null 2>&1 || {
+    echo "No package lists: the container can't reach deb.debian.org (DNS?). Run it with --network host."
+    exit 1
+}
 # Compilers and headers for Kivy (SDL2, OpenGL) and python-rtmidi (ALSA); Xvfb and Mesa
 # for the self-test
 apt-get install -y -qq --no-install-recommends \

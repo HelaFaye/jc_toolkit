@@ -192,7 +192,7 @@ pins python-for-android, and so on). In short:
 |---|---|---|
 | Windows, macOS, Linux | `scripts/setup_venv.sh` (Windows: `scripts\setup_venv.bat`), then `.venv/bin/python scripts/build.py desktop` | `dist/` (a folder or `.app`, and a `.zip` / `.tar.gz`) |
 | Windows ARM64 | `python scripts\build_windows_arm64.py` (an ARM64 Python and Visual Studio's ARM64 tools) | `dist\...-windows-arm64.zip` |
-| Linux x86 (32-bit) | `docker run --rm --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh` | `dist/...-linux-x86.tar.gz` |
+| Linux x86 (32-bit) | `docker run --rm --network host --platform linux/386 -v "$PWD":/src -w /src i386/debian:bookworm sh scripts/build_linux_x86.sh` | `dist/...-linux-x86.tar.gz` |
 | Android | `python3 scripts/build.py android` (Linux or macOS; on Windows use WSL2) | `bin/jctool-<version>-*-debug.apk` |
 | Switch | `docker run --rm -v "$PWD":/src -w /src devkitpro/devkita64 make -C switch`, or `make -C switch` with [devkitPro](https://devkitpro.org/wiki/Getting_Started) | `switch/jctool.nro` |
 
