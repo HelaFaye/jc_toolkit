@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 
-from . import __version__, calibration, ops, presets, screen_color
+from . import __version__, bluecubemod, calibration, ops, presets, screen_color
 from .core import JoyCon, Ui
 from .hidio import (JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, Device, enumerate_controllers,
                     list_hid_devices)
@@ -208,7 +208,8 @@ class Cli:
         if self.args.demo:
             from .fake import FakeJoyCon
             if self.fake is None:
-                self.fake = FakeJoyCon(PRIORITY.get(self.args.demo, JOYCON_R))
+                self.fake = (FakeJoyCon(PROCON, bluecubemod=True) if self.args.demo == "bcm"
+                             else FakeJoyCon(PRIORITY.get(self.args.demo, JOYCON_R)))
             return [self.fake.found()]
         found = enumerate_controllers()
         if self.args.p:
@@ -237,7 +238,8 @@ class Cli:
         self.jc = JoyCon(dev, self.ui)
         self.jc.silence_input_report()
         self.jc.set_led_busy()
-        print("[+] Connected to %s" % TYPE_NAMES[self.jc.type])
+        self.jc.bcm = bluecubemod.detect(self.jc)
+        print("[+] Connected to %s" % bluecubemod.device_name(self.jc))
         return True
 
     def select_device(self):
@@ -301,10 +303,14 @@ class Cli:
             return
         jc = self.jc
         info = ops.device_info(jc)
-        print("\nController:  %s" % TYPE_NAMES[jc.type])
+        print("\nController:  %s" % bluecubemod.device_name(jc))
+        if jc.bcm is not None:
+            jc.bcm = bluecubemod.detect(jc) or jc.bcm
+            print("BlueCubeMod: %s" % jc.bcm.describe())
+            print("             " + jc.bcm.settings_text().replace("\n", "\n             "))
         print("FW Version:  %s" % info.fw)
         print("MAC:         %s" % info.mac)
-        print("S/N:         %s" % (jc.get_sn() if jc.type != PROCON else "Not supported"))
+        print("S/N:         %s" % (jc.get_sn() if bluecubemod.sn_supported(jc) else "Not supported"))
         self.show_battery()
         self.show_temperature()
         self.show_colors()
@@ -519,6 +525,8 @@ class Cli:
             res = calibration.write_stick_params(jc, p[0:2], p[2:4] if jc.type == PROCON else None)
             print("[+] The Stick Device Parameters were written to SPI!" if res == 0 else
                   "[-] Failed to write the Stick Device Parameters to SPI! Please try again..")
+        elif choice == 3 and not bluecubemod.has_feature(jc, "motion"):
+            print("[-] A BlueCubeMod has no motion sensors.")
         elif choice == 3:
             two = self.ask_yes_no("Measure in two positions (turned 180 degrees between them; cancels the surface's tilt)?")
             origins = self.motion_wizard(two)
@@ -690,7 +698,7 @@ class Cli:
         if not self.need_device():
             return
         jc = self.jc
-        if jc.type == PROCON:
+        if not bluecubemod.sn_supported(jc):
             print("[-] Changing or restoring the S/N is not supported for Pro Controllers!")
             return
         print("\nCurrent S/N: %s\n\n 1. Change S/N\n 2. Restore S/N from the backup inside the controller\n 0. Back" % jc.get_sn())
@@ -946,6 +954,9 @@ class Cli:
         if self.jc.type == JOYCON_L:
             print("[-] NFC is only on the Joy-Con (R) and the Pro Controller.")
             return
+        if not bluecubemod.has_feature(self.jc, "nfc"):
+            print("[-] A BlueCubeMod has no NFC reader.")
+            return
         print("\nTouch the NFC area with an amiibo or NFC tag... (Enter to stop)")
         self.jc.enable_nfc_scanning = True
         res = self.jc.nfc_tag_info()
@@ -995,13 +1006,41 @@ class Cli:
         ("IR camera (Joy-Con R)", "cmd_ir_camera"), ("NFC / amiibo scan (Joy-Con R, Pro)", "cmd_nfc"),
         ("Debug: send a custom command", "cmd_debug"), ("List HID devices", "cmd_list_hid"),
         ("Disconnect the controller", "cmd_disconnect"),
+        ("BlueCubeMod settings (GameCube controller)", "cmd_bluecubemod"),
     ]
+
+    def cmd_bluecubemod(self):
+        if not self.need_device():
+            return
+        jc = self.jc
+        info = bluecubemod.detect(jc)
+        if info is None:
+            print("[-] This controller isn't a BlueCubeMod (v3 or later).")
+            return
+        jc.bcm = info
+        print("\n%s\n%s\n" % (info.describe(), info.settings_text()))
+        if not self.ask_yes_no("Change the settings?"):
+            return
+        print("Triggers (the GameCube's analog L and R):")
+        for i, t in enumerate(bluecubemod.TRIGGER_MODES):
+            print(" %d. %s" % (i, t))
+        mode = self.ask_int("Trigger mode", info.trigger_mode, 0, len(bluecubemod.TRIGGER_MODES) - 1)
+        threshold = info.threshold
+        if mode != 0:
+            threshold = self.ask_int("Threshold (1-255; fully pressed is about 200)", info.threshold, 1, 255)
+        print("Sticks:")
+        for i, t in enumerate(bluecubemod.STICK_MODES):
+            print(" %d. %s" % (i, t))
+        sticks = self.ask_int("Stick mode", info.stick_mode, 0, len(bluecubemod.STICK_MODES) - 1)
+        res = bluecubemod.set_settings(jc, mode, threshold, sticks)
+        print({0: "[+] Saved.", 1: "[-] The controller refused the settings.",
+               2: "[-] Applied, but the controller couldn't save them."}.get(res, "[-] The controller didn't answer."))
 
     def cmd_list_hid(self):
         print(list_hid_devices())
 
     def print_menu(self):
-        print("\n=== Joy-Con Toolkit (CLI) ===%s" % ("   [%s]" % TYPE_NAMES[self.jc.type] if self.jc else ""))
+        print("\n=== Joy-Con Toolkit (CLI) ===%s" % ("   [%s]" % bluecubemod.device_name(self.jc) if self.jc else ""))
         for i, (name, _) in enumerate(self.MENU, 1):
             print("%2d. %s" % (i, name))
         print(" 0. Exit")
@@ -1039,8 +1078,8 @@ def parse_args(argv=None):
     p.add_argument("-l", action="store_true", help="list all HID devices first")
     p.add_argument("-d", action="store_true", help="log controller traffic to traffic_log.txt")
     p.add_argument("-p", choices=sorted(PRIORITY), help="prefer a controller type when several are connected")
-    p.add_argument("--demo", nargs="?", const="r", choices=sorted(PRIORITY),
-                   help="use an emulated controller (default: Joy-Con (R))")
+    p.add_argument("--demo", nargs="?", const="r", choices=sorted(PRIORITY) + ["bcm"],
+                   help="use an emulated controller (default: Joy-Con (R); bcm: a BlueCubeMod)")
     p.add_argument("--expert", action="store_true",
                    help="expert mode: allow the debug command's SPI subcommands (10 read, 11 write, 12 erase)")
     return p.parse_args(argv)

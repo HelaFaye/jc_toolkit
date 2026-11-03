@@ -45,6 +45,7 @@ info, Run anyway), and macOS may say the app can't be checked (right-click it, O
 | IR Camera | Joy-Con (R): capture (saved as `IRcamera.png`), stream with live settings, every setting of the original (resolution, Capture / Pointing / Clustering, LEDs and intensity, flashlight, strobe, external filter, selfie, exposure, auto exposure, gain, de-noise, custom registers), Quick capture |
 | NFC | Amiibo / NTAG scan and dump; MIFARE tags: the UID (their contents can't be read) |
 | Debug | Custom commands and their replies (SPI subcommands in expert mode), the HID device list, the traffic log, About |
+| BlueCubeMod | A GameCube controller made a Pro Controller by [BlueCubeMod](#bluecubemod-gamecube-controllers) v3: whether the GameCube controller answers, and its settings (how the analog triggers map, how the sticks are centered) |
 
 The info section shows the S/N, firmware, MAC, controller type and which calibration is in
 use; the status bar has Connect / Disconnect, the controller priority (which type to pick
@@ -60,8 +61,8 @@ tunes and MIDI files, the IR camera with a 24-bit color preview in the terminal,
 commands, the HID listing and disconnect. The menu reads standard input, so it can be
 scripted: `printf '2\n0\n' | jctool-cli` prints the device info.
 
-Options (both programs): `-d` writes `traffic_log.txt`, `--demo [l|r|pro]` uses an emulated
-controller (no hardware). The CLI also has `-l` (list HID devices), `-p l|r|pro` (controller
+Options (both programs): `-d` writes `traffic_log.txt`, `--demo [l|r|pro|bcm]` uses an emulated
+controller (no hardware; `bcm`: a BlueCubeMod). The CLI also has `-l` (list HID devices), `-p l|r|pro` (controller
 priority) and `--expert`; the app has `--selftest`.
 
 ### Differences from the original
@@ -85,6 +86,22 @@ priority) and `--expert`; the app has `--selftest`.
   connection, it shows the link health instead.
 - Additions: guided stick and motion calibration, MIDI on the HD Rumble, link health,
   calibration status, the command line on every system, and Android.
+
+### BlueCubeMod (GameCube controllers)
+
+[BlueCubeMod](https://github.com/HelaFaye/BlueCubeMod) turns a GameCube controller into a
+Pro Controller over Bluetooth with an ESP32 inside it. From v3, its firmware emulates a Pro
+Controller's whole SPI flash, so the toolkit works on it like on a Pro Controller: colors
+(the Switch shows them), the serial number (which a real Pro Controller hasn't got),
+stick calibration (the guided wizard measures the GameCube stick), backups and restores,
+the button test and rumble (on the GameCube controller's motor). The toolkit recognizes
+it, names it next to the controller type, and leaves out what it hasn't got: NFC, the IR
+camera and the motion sensors. Its settings are on the BlueCubeMod screen (menu item 19 in
+the CLI). BlueRetro goes the other way (Switch controllers on a GameCube) and doesn't need
+the toolkit.
+
+The Switch app needs nothing special for it: everything it does goes through the SPI
+flash.
 
 ## Using it
 
@@ -241,6 +258,8 @@ Other code and research this project builds on:
 
 * [switchbrew](https://switchbrew.org/wiki/Joy-Con): the official colors recovered from SPI dumps, and the factory configuration's layout.
 * The reporters in [CTCaer/jc_toolkit#28](https://github.com/CTCaer/jc_toolkit/issues/28) and [#104](https://github.com/CTCaer/jc_toolkit/issues/104) (Rabicrysta, Gpcas9, Ray160, jmickelonis, CLAPD and others): the Pro Controller editions' colors and the `0x601B` fix.
+
+* [NathanReeves](https://github.com/NathanReeves/BlueCubeMod): BlueCubeMod, the GameCube controller as a Switch Pro Controller.
 
 * [dekuNukem and contributors](https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering): Joy-Con protocol reverse engineering.
 * [shinyquagsire23](https://github.com/shinyquagsire23/HID-Joy-Con-Whispering): hidapi usage on Linux.

@@ -149,6 +149,7 @@ class JoyCon:
         self.ir_last_frame_missing = 0
         self.ir_last_capture_stale = False
         self.ir_pending_live = None      # An IrConfig to apply during a stream (live config)
+        self.bcm = None                  # jctool.bluecubemod.Info on a BlueCubeMod (see detect())
 
     # ------------------------------------------------------------------------------------
     # Packets

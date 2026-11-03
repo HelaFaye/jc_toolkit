@@ -10,7 +10,7 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.screenmanager import NoTransition, Screen, ScreenManager
 from kivy.uix.widget import Widget
 
-from .. import calibration
+from .. import bluecubemod, calibration
 from ..calibration import MotionWizard, StickCal, StickWizard
 from ..hidio import JOYCON_L, JOYCON_R, PROCON
 from .panels import Panel
@@ -562,3 +562,4 @@ class CalibrationPanel(Panel):
     def on_device(self):
         self.sticks.on_device()
         self.manual.on_device()
+        self.motion.disabled = not bluecubemod.has_feature(self.jc, "motion")    # No sensors on a BlueCubeMod

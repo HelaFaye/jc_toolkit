@@ -13,7 +13,7 @@ from kivy.uix.progressbar import ProgressBar
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
 
-from .. import ops, presets, screen_color
+from .. import bluecubemod, ops, presets, screen_color
 from ..hidio import JOYCON_L, JOYCON_R, PROCON, TYPE_NAMES, is_android, list_hid_devices
 from . import eyedropper, storage
 from .widgets import (ACCENT, BACK, BUTTON, DARK, DIM, ERROR, GRID, TEXT, WARN, Btn, Check, Choice, Field,
@@ -577,7 +577,7 @@ class SerialPanel(Panel):
 
     def on_device(self):
         self.current.text = "Current S/N: " + self.app.lbl_sn.value.text
-        self.disabled = self.jc.type == PROCON
+        self.disabled = not bluecubemod.sn_supported(self.jc)
 
     def change(self):
         sn = self.new_sn.text.strip()
@@ -723,7 +723,7 @@ class NfcPanel(Panel):
         self.add_widget(scroll)
 
     def on_device(self):
-        self.disabled = self.jc.type == JOYCON_L
+        self.disabled = self.jc.type == JOYCON_L or not bluecubemod.has_feature(self.jc, "nfc")
 
     def toggle(self):
         if self.jc is not None and self.jc.enable_nfc_scanning:
@@ -833,6 +833,7 @@ class DebugPanel(Panel):
 from .panel_calibration import CalibrationPanel   # noqa: E402
 from .panel_ir import IrPanel                      # noqa: E402
 from .panel_rumble import RumblePanel              # noqa: E402
+from .panel_bcm import BlueCubeModPanel            # noqa: E402
 
 PANELS = [
     ("Device", DevicePanel),
@@ -844,4 +845,5 @@ PANELS = [
     ("IR Camera", IrPanel),
     ("NFC", NfcPanel),
     ("Debug", DebugPanel),
+    ("BlueCubeMod", BlueCubeModPanel),
 ]

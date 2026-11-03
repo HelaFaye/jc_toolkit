@@ -22,8 +22,11 @@ PRODUCT_IDS = {JOYCON_L: 0x2006, JOYCON_R: 0x2007, PROCON: 0x2009}
 class FakeJoyCon:
     MAC = bytes([0x98, 0xB6, 0xE9, 0x12, 0x34, 0x56])
 
-    def __init__(self, type_=JOYCON_R):
-        self.type = type_
+    def __init__(self, type_=JOYCON_R, bluecubemod=False):
+        self.type = PROCON if bluecubemod else type_
+        type_ = self.type
+        self.bluecubemod = bluecubemod   # Answers BlueCubeMod's vendor subcommands (0xBC, 0xBD)
+        self.bcm_settings = [0, 0x80, 0]
         self.product_id = PRODUCT_IDS[type_]
         self.spi = bytearray(b"\xFF" * 0x80000)
         self._lock = threading.Lock()
@@ -86,6 +89,10 @@ class FakeJoyCon:
         params = [0x0F, 0x30, 0x61, 0x96, 0x30, 0xF3, 0xD4, 0x14, 0x54, 0x41, 0x15, 0x54, 0xC7, 0x79, 0x9C, 0x33, 0x36, 0x63]
         put(0x6086, params)
         put(0x6098, params)
+        if bluecubemod:                         # What BlueCubeMod writes at its first boot
+            put(0x6000, bytes(5) + b"BCM8A102030")
+            put(0x601B, [0x02])
+            put(0x6050, [0x4F, 0x3C, 0x8F, 0xE6, 0xE6, 0xE6, 0x3F, 0x31, 0x75, 0x3F, 0x31, 0x75])
 
     def _put(self, offset, data):
         self.spi[offset:offset + len(data)] = bytes(data)
@@ -95,6 +102,8 @@ class FakeJoyCon:
         return Device(self, self.type, "fake")
 
     def found(self):
+        if self.bluecubemod:
+            return Found("fake", self.type, "Emulated BlueCubeMod (Pro Controller)")
         return Found("fake", self.type, "Emulated " + {JOYCON_L: "Joy-Con (L)", JOYCON_R: "Joy-Con (R)", PROCON: "Pro Controller"}[self.type])
 
     # ------------------------------------------------------------------------------------
@@ -170,6 +179,15 @@ class FakeJoyCon:
             self._ack(0x22, 0x80)
         elif sub == 0x50:
             self._ack(0x50, 0xD0, b"\x10\x06")    # 0x610: 3.88V
+        elif sub == 0xBC and self.bluecubemod:
+            self._ack(0xBC, 0xBC, b"BCM" + bytes([1, 3, 0, 0] + self.bcm_settings + [1]) +
+                      bytes([0x20, 0x80, 0x80, 0x80, 0x80, 0x80, 0, 0]))
+        elif sub == 0xBD and self.bluecubemod:
+            mode, threshold, sticks = d[11], d[12], d[13]
+            ok = mode <= 2 and sticks <= 1 and threshold > 0
+            if ok:
+                self.bcm_settings = [mode, threshold, sticks]
+            self._ack(0xBD, 0xBD, b"\x00" if ok else b"\x01")
         else:
             self._ack(sub, 0x80)
         return len(d)

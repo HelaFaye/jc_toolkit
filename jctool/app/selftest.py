@@ -27,7 +27,7 @@ class SelfTest:
     # A step: fn() returns None when done, or a (condition, seconds) to wait for first
     def start(self):
         self.steps = [self.connected, self.colors, self.eyedropper, self.restore_check, self.debug_guard, self.ir_capture, self.stick_wizard, self.motion_wizard, self.button_test,
-                      self.backup, self.midi_file, self.tune, self.finish]
+                      self.backup, self.midi_file, self.tune, self.bluecubemod, self.finish]
         Clock.schedule_once(lambda dt: self.next(), 1.0)
 
     def next(self):
@@ -331,6 +331,35 @@ class SelfTest:
         self.check(shown and "disabled" in shown[0] and self.fake.spi_writes == writes,
                    "debug: SPI subcommands disabled without expert mode")
         self.next()
+
+    def bluecubemod(self):
+        """A BlueCubeMod (a GameCube controller as a Pro Controller): detected, its serial
+        number editable, no NFC or motion calibration, its settings written."""
+        from ..fake import FakeJoyCon
+        from ..hidio import PROCON
+        app = self.app
+        app.fake = FakeJoyCon(PROCON, bluecubemod=True)
+        app.lbl_dev.value.text = ""
+        app.open_device(app.fake.device())
+
+        def connected():
+            p = app.panels
+            ok = ("BlueCubeMod 3.0.0" in app.lbl_dev.value.text and app.lbl_sn.value.text == "BCM8A102030" and
+                  not p["Serial"].disabled and p["NFC"].disabled and p["Calibration"].motion.disabled and
+                  not p["BlueCubeMod"].disabled)
+            self.check(ok, "BlueCubeMod: detected, S/N shown and editable, no NFC or motion calibration")
+            app.show("BlueCubeMod")
+            panel = p["BlueCubeMod"]
+            self.wait(lambda: "GameCube controller connected" in panel.status.text, 5, lambda: apply(panel))
+
+        def apply(panel):
+            panel.triggers.index = 2
+            panel.threshold.value = 100
+            panel.sticks.index = 1
+            panel.apply()
+            self.wait(lambda: app.fake.bcm_settings == [2, 100, 1], 5, lambda: (
+                self.check(app.fake.bcm_settings == [2, 100, 1], "BlueCubeMod: settings written"), self.next()))
+        self.wait(lambda: "BlueCubeMod" in app.lbl_dev.value.text and app.lbl_sn.value.text.startswith("BCM"), 10, connected)
 
     def finish(self):
         print("\nAll checks passed." if self.failed == 0 else "\n%d check(s) FAILED." % self.failed, flush=True)

@@ -48,7 +48,7 @@ from kivy.uix.image import Image                           # noqa: E402
 from kivy.uix.screenmanager import NoTransition, Screen, ScreenManager   # noqa: E402
 from kivy.uix.scrollview import ScrollView                 # noqa: E402
 
-from .. import __version__, calibration, ops               # noqa: E402
+from .. import __version__, bluecubemod, calibration, ops   # noqa: E402
 from ..core import JoyCon, Ui                              # noqa: E402
 from ..hidio import Device, JOYCON_L, JOYCON_R, NOTHING, PROCON, TYPE_NAMES, enumerate_controllers, is_android   # noqa: E402
 from .widgets import (ACCENT, BACK, DARK, DIM, ERROR, TEXT, WARN, Btn, Filled, Lbl, Tab, Choice,   # noqa: E402
@@ -252,7 +252,7 @@ class JoyConToolkitApp(App):
         if self.demo:
             if self.jc is None:
                 from ..fake import FakeJoyCon
-                self.fake = FakeJoyCon(self.demo)
+                self.fake = FakeJoyCon(PROCON, bluecubemod=True) if self.demo == "bcm" else FakeJoyCon(self.demo)
                 self.open_device(self.fake.device())
             else:
                 self.refresh()
@@ -298,6 +298,7 @@ class JoyConToolkitApp(App):
         def setup(jc):
             jc.silence_input_report()
             jc.set_led_busy()
+            jc.bcm = bluecubemod.detect(jc)
             jc.send_rumble()
             return True
         self.worker.run(setup, lambda r: self.refresh())
@@ -309,7 +310,7 @@ class JoyConToolkitApp(App):
 
         def read(jc):
             info = ops.device_info(jc)
-            sn = jc.get_sn() if jc.type != PROCON else "Not supported"
+            sn = jc.get_sn() if bluecubemod.sn_supported(jc) else "Not supported"
             return {"info": info, "sn": sn, "battery": ops.battery(jc), "temp": ops.temperature_c(jc),
                     "colors": ops.read_colors(jc), "cal": calibration.read_status(jc)}
         self.worker.run(read, self._refreshed)
@@ -321,7 +322,7 @@ class JoyConToolkitApp(App):
         self.lbl_sn.value.text = r["sn"]
         self.lbl_fw.value.text = r["info"].fw
         self.lbl_mac.value.text = r["info"].mac
-        self.lbl_dev.value.text = TYPE_NAMES[self.jc.type] + (" (emulated)" if self.demo else "")
+        self.lbl_dev.value.text = bluecubemod.device_name(self.jc) + (" (emulated)" if self.demo else "")
         self.set_calibration_status(r["cal"])
         self.show_battery(r["battery"])
         self.temperature = r["temp"]
@@ -400,15 +401,15 @@ class JoyConToolkitApp(App):
 
 def main(argv=None):
     p = argparse.ArgumentParser(description="Joy-Con Toolkit")
-    p.add_argument("--demo", nargs="?", const="r", choices=["l", "r", "pro"],
-                   help="use an emulated controller (default: Joy-Con (R))")
+    p.add_argument("--demo", nargs="?", const="r", choices=["l", "r", "pro", "bcm"],
+                   help="use an emulated controller (default: Joy-Con (R); bcm: a BlueCubeMod)")
     p.add_argument("-d", action="store_true", help="write traffic_log.txt")
     p.add_argument("--selftest", action="store_true", help="drive the screens against an emulated Joy-Con (R) and exit")
     args = p.parse_args(argv)
     if Window is None:
         sys.exit("Joy-Con Toolkit couldn't open a window (see Kivy's messages above). On Linux it needs X11 "
                  "or XWayland; if SDL_VIDEODRIVER is set, try SDL_VIDEODRIVER=x11.")
-    demo = {"l": JOYCON_L, "r": JOYCON_R, "pro": PROCON}[args.demo] if args.demo else False
+    demo = {"l": JOYCON_L, "r": JOYCON_R, "pro": PROCON, "bcm": "bcm"}[args.demo] if args.demo else False
     if args.selftest:
         demo = JOYCON_R
     app = JoyConToolkitApp(demo=demo, traffic_log=args.d)
