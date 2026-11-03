@@ -34,9 +34,9 @@ class BlueCubeModPanel(Panel):
         s.add_widget(row)
         s.add_widget(Lbl("The Switch's L and R: the third trigger mode (a light press). Z is R; with Z held, "
                          "Start is -, D-pad up is HOME and down is Capture.\n"
-                         "Raw sticks use the calibration in the controller's memory (calibrate them on the "
-                         "Calibration screen or on the Switch); re-centered ones move it to where the sticks "
-                         "were at power-on, like a GameCube.",
+                         "Re-centered sticks (the default) take where they rest at power-on as the center, "
+                         "like a GameCube; the calibration (the Calibration screen, or the Switch's) sets "
+                         "their range. Raw sticks use the calibration's center too.",
                          color=DIM, size_hint_y=None, height=dp(96)))
         s.add_widget(Widget())
         self.add_widget(s)

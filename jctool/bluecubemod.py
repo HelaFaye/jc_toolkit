@@ -17,8 +17,8 @@ TRIGGER_MODES = [
     "Analog past the threshold: L / R; clicked: ZL / ZR",
 ]
 STICK_MODES = [
-    "Raw (the calibration in the controller's memory applies)",
-    "Re-centered at power-on (like a GameCube)",
+    "Raw (the calibration in the controller's memory applies, its center too)",
+    "Re-centered at power-on, like a GameCube (the calibration's range applies)",
 ]
 
 

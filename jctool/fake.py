@@ -26,7 +26,7 @@ class FakeJoyCon:
         self.type = PROCON if bluecubemod else type_
         type_ = self.type
         self.bluecubemod = bluecubemod   # Answers BlueCubeMod's vendor subcommands (0xBC, 0xBD)
-        self.bcm_settings = [0, 0x80, 0]
+        self.bcm_settings = [0, 0x80, 1]
         self.product_id = PRODUCT_IDS[type_]
         self.spi = bytearray(b"\xFF" * 0x80000)
         self._lock = threading.Lock()
